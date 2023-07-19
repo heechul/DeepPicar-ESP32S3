@@ -1,5 +1,9 @@
 #include "esp_camera.h"
 #include <WiFi.h>
+#include "NeuralNetwork.h"
+
+NeuralNetwork *nn;
+
 //
 // WARNING!!! PSRAM IC required for UXGA resolution and high JPEG quality
 //            Ensure ESP32 Wrover Module or other board with PSRAM is selected
@@ -169,8 +173,7 @@ void setup() {
   Serial.print("Camera Ready! Use 'http://");
   Serial.print(WiFi.localIP());
   Serial.println("' to connect");
-
-
+  
   // sets the pins as outputs:
   pinMode(f_Pin, OUTPUT);
   pinMode(b_Pin, OUTPUT);
@@ -183,7 +186,11 @@ void setup() {
   
   // attach the channel to the GPIO to be controlled
   ledcAttachPin(t_Pin, pwmChannel);
-  ledcWrite(pwmChannel, 0);  
+  ledcWrite(pwmChannel, 0);
+
+  // register pilotnet algo
+  nn = new NeuralNetwork();
+
 }
 
 void run() {

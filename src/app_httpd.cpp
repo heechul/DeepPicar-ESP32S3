@@ -24,13 +24,19 @@
 #include "esp32-hal-log.h"
 #endif
 
+#include "NeuralNetwork.h"
+extern NeuralNetwork *nn;
+
+// enable deeppicar dnn
+static int g_use_dnn = 0;
+
 // Face Detection will not work on boards without (or with disabled) PSRAM
 #ifdef BOARD_HAS_PSRAM
-#define CONFIG_ESP_FACE_DETECT_ENABLED 1
+#define CONFIG_ESP_FACE_DETECT_ENABLED 0
 // Face Recognition takes upward from 15 seconds per frame on chips other than ESP32S3
 // Makes no sense to have it enabled for them
 #if CONFIG_IDF_TARGET_ESP32S3
-#define CONFIG_ESP_FACE_RECOGNITION_ENABLED 1
+#define CONFIG_ESP_FACE_RECOGNITION_ENABLED 0
 #else
 #define CONFIG_ESP_FACE_RECOGNITION_ENABLED 0
 #endif
@@ -517,6 +523,69 @@ static esp_err_t capture_handler(httpd_req_t *req)
 #endif
 }
 
+// input image size
+#define INPUT_W 160
+#define INPUT_H 66
+
+extern void left();
+extern void right();
+extern void center();
+extern void forward();
+extern void backward();
+extern void throttleup();
+extern void throttledown();
+extern void set_throttle(int);
+extern void nomove();
+
+#include <Arduino.h>
+
+// Begin the capture and wait for it to finish
+int GetImage(camera_fb_t * fb, uint8_t* image_data) 
+{
+    // MicroPrintf("fb->width=%d, fb->height=%d, fb->len=%d\n", fb->width, fb->height, fb->len);
+    // MicroPrintf("INPUT_W=%d, INPUT_H=%d\n", INPUT_W, INPUT_H);
+
+    if (fb->width == INPUT_W && fb->height == INPUT_H) {
+        memcpy(image_data, fb->buf, fb->len);
+    } else {
+        // Trimming Image
+        int post = 0;
+        int startx = (fb->width - INPUT_W) / 2;
+        int starty = (fb->height - INPUT_H);
+        for (int y = 0; y < INPUT_H; y++) {
+            for (int x = 0; x < INPUT_W; x++) {
+                int getPos = (starty + y) * fb->width + startx + x;
+                // MicroPrintf("input[%d]: fb->buf[%d]=%d\n", post, getPos, fb->buf[getPos]);
+                image_data[post] = fb->buf[getPos];
+                post++;
+            }
+        }
+    }
+    return 0;
+}
+
+inline float rad2deg(float rad) 
+{
+  return 180.0*rad/3.14;
+}
+
+// steering
+#define CENTER 0
+#define RIGHT 1
+#define LEFT 2
+
+int GetAction(float rad)
+{
+    int deg = (int)rad2deg(rad);
+    if (deg < 10 and deg > -10)
+        return CENTER;
+    else if (deg >= 10)
+        return RIGHT;
+    else if (deg < -10)
+        return LEFT;
+    return -1;
+}
+
 static esp_err_t stream_handler(httpd_req_t *req)
 {
     camera_fb_t *fb = NULL;
@@ -585,6 +654,39 @@ static esp_err_t stream_handler(httpd_req_t *req)
         {
             _timestamp.tv_sec = fb->timestamp.tv_sec;
             _timestamp.tv_usec = fb->timestamp.tv_usec;
+
+            if (g_use_dnn) 
+            {
+                long startTime, dur;
+                GetImage(fb, nn->getInputBuffer());
+                startTime = millis();
+                if (kTfLiteOk != nn->predict())
+                {
+                    printf("Invoke failed.\n");
+                }
+                dur = millis() - startTime;
+                float angle = nn->getOutput();
+
+                int deg = (int)rad2deg(angle);
+                printf("DNN Inference took %d ms. angle=%.3f(%d)\n", (int)dur, angle, deg);
+
+                if (deg < 10 and deg > -10) 
+                {
+                    printf("CENTER\n");
+                    center();
+                } 
+                else if (deg >= 10) 
+                {
+                    printf("RIGHT\n");
+                    right();
+                } 
+                else if (deg <= -10) 
+                {
+                    printf("LEFT\n");
+                    left();
+                }
+            }
+              
 #if CONFIG_ESP_FACE_DETECT_ENABLED
     #if ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_INFO
             fr_start = esp_timer_get_time();
@@ -815,21 +917,6 @@ static esp_err_t parse_get(httpd_req_t *req, char **obuf)
     httpd_resp_send_404(req);
     return ESP_FAIL;
 }
-
-extern void left();
-extern void right();
-extern void center();
-extern void forward();
-extern void backward();
-extern void throttleup();
-extern void throttledown();
-extern void set_throttle(int);
-extern void nomove();
-
-int g_use_dnn = 0;
-
-#include <Arduino.h>
-
 
 static esp_err_t cmd_handler(httpd_req_t *req)
 {

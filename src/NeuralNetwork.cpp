@@ -1,4 +1,12 @@
-#include <ESP_TF.h>
+// #include <ESP_TF.h>
+
+#if !defined(CONFIG_NN_OPTIMIZED)
+#error "CONFIG_NN_OPTIMIZED"
+#endif
+#if !defined(CONFIG_IDF_TARGET_ESP32S3)
+#error "CONFIG_IDF_TARGET_ESP32S3"
+#endif
+
 #include "NeuralNetwork.h"
 #include "opt-160x66x3.cc"
 

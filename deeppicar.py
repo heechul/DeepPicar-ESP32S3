@@ -55,6 +55,7 @@ def turn_off():
         keyfile.close()
         vidfile.release()
 
+# scaled crop. return img_height x img_width image
 def get_image(img):
     orig_h, orig_w, _ = img.shape
     scaled_h = int(orig_h * params.img_width / orig_w)
@@ -63,13 +64,10 @@ def get_image(img):
     scaled_img = cv2.resize(img, (scaled_w, scaled_h))
     # print(scaled_img.shape)
     # crop bottom center pixels of the model input size
-    if args.pre == "crop":
-        startx = int((scaled_w - params.img_width) / 2);
-        starty = int((scaled_h - params.img_height));
-        return scaled_img[starty:starty+params.img_height, startx:startx+params.img_width,:]
-    else:
-        return scaled_img
-
+    startx = int((scaled_w - params.img_width) * 0.5);
+    starty = int((scaled_h - params.img_height) * 1.0);
+    return scaled_img[starty:starty+params.img_height, startx:startx+params.img_width,:]
+ 
 def preprocess(img):
     img = get_image(img)
     # Convert to grayscale and readd channel dimension

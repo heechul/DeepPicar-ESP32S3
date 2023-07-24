@@ -72,6 +72,10 @@ static int g_use_dnn = 0;
 #define FACE_COLOR_YELLOW (FACE_COLOR_RED | FACE_COLOR_GREEN)
 #define FACE_COLOR_CYAN (FACE_COLOR_BLUE | FACE_COLOR_GREEN)
 #define FACE_COLOR_PURPLE (FACE_COLOR_BLUE | FACE_COLOR_RED)
+#else
+#define COLOR_GREEN 0x0000FF00
+#define COLOR_RED 0x00FF0000
+#define COLOR_BLUE 0x000000FF
 #endif
 
 // Enable LED FLASH setting
@@ -539,7 +543,7 @@ extern void nomove();
 
 #include <Arduino.h>
 
-uint8_t rgb_image_data[INPUT_W * INPUT_H * 3];
+// uint8_t rgb_image_data[INPUT_W * INPUT_H * 3];
 
 uint32_t rgb565torgb888(uint16_t color)
 {
@@ -556,9 +560,7 @@ uint32_t rgb565torgb888(uint16_t color)
 // prepare input image tensor
 int GetImage(camera_fb_t * fb, float* image_data) 
 {
-    // MicroPrintf("fb->width=%d, fb->height=%d, fb->len=%d\n", fb->width, fb->height, fb->len);
-    // MicroPrintf("INPUT_W=%d, INPUT_H=%d\n", INPUT_W, INPUT_H);
-    MicroPrintf("fb: %dx%d-fmt:%d-len:%d INPUT: %dx%d", fb->width, fb->height, fb->format, fb->len, INPUT_W, INPUT_H);
+    // MicroPrintf("fb: %dx%d-fmt:%d-len:%d INPUT: %dx%d", fb->width, fb->height, fb->format, fb->len, INPUT_W, INPUT_H);
     // fmt2rgb888(fb->buf, fb->len, fb->format, (uint8_t *)rgb_image_data);
     assert(fb->format == PIXFORMAT_RGB565);
 
@@ -637,6 +639,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
     {
         last_frame = esp_timer_get_time();
     }
+    int64_t fr_cap, fr_pre, fr_dnn, fr_enc;
 
     res = httpd_resp_set_type(req, _STREAM_CONTENT_TYPE);
     if (res != ESP_OK)
@@ -662,6 +665,8 @@ static esp_err_t stream_handler(httpd_req_t *req)
 #endif
 
         fb = esp_camera_fb_get();
+        fr_cap = esp_timer_get_time();
+
         if (!fb)
         {
             log_e("Camera capture failed");
@@ -674,36 +679,42 @@ static esp_err_t stream_handler(httpd_req_t *req)
 
             if (g_use_dnn) 
             {
-                long startTime, dur;
+                long dur;
                 GetImage(fb, nn->getInputBuffer());
-                startTime = millis();
+                fr_pre = esp_timer_get_time();
+
                 if (kTfLiteOk != nn->predict())
                 {
                     printf("Invoke failed.\n");
                 }
-                dur = millis() - startTime;
                 float angle = nn->getOutput();
+                fr_dnn = esp_timer_get_time();
 
                 int deg = (int)rad2deg(angle);
-                printf("DNN Inference took %d ms. angle=%.3f(%d)\n", (int)dur, angle, deg);
+                printf("DNN angle=%.3f(%d)\n", angle, deg);
 
                 if (deg < 10 and deg > -10) 
                 {
-                    printf("CENTER\n");
                     center();
                 } 
                 else if (deg >= 10) 
                 {
-                    printf("RIGHT\n");
                     right();
                 } 
                 else if (deg <= -10) 
                 {
-                    printf("LEFT\n");
                     left();
                 }
+
+                fb_data_t rfb;
+                rfb.width = fb->width;
+                rfb.height = fb->height;
+                rfb.data = fb->buf;
+                rfb.bytes_per_pixel = 2;
+                rfb.format = FB_RGB565;
+                fb_gfx_printf(&rfb, 0, 0, COLOR_GREEN, "DNN: %d", deg);
             }
-              
+
 #if CONFIG_ESP_FACE_DETECT_ENABLED
     #if ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_INFO
             fr_start = esp_timer_get_time();
@@ -718,6 +729,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
                 if (fb->format != PIXFORMAT_JPEG)
                 {
                     bool jpeg_converted = frame2jpg(fb, 80, &_jpg_buf, &_jpg_buf_len);
+
                     esp_camera_fb_return(fb);
                     fb = NULL;
                     if (!jpeg_converted)
@@ -731,6 +743,8 @@ static esp_err_t stream_handler(httpd_req_t *req)
                     _jpg_buf_len = fb->len;
                     _jpg_buf = fb->buf;
                 }
+                fr_enc = esp_timer_get_time();
+
 #if CONFIG_ESP_FACE_DETECT_ENABLED
             }
             else
@@ -858,6 +872,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
         {
             res = httpd_resp_send_chunk(req, (const char *)_jpg_buf, _jpg_buf_len);
         }
+    out:
         if (fb)
         {
             esp_camera_fb_return(fb);
@@ -884,8 +899,12 @@ static esp_err_t stream_handler(httpd_req_t *req)
         int64_t process_time = (fr_encode - fr_start) / 1000;
 #endif
 
-        int64_t frame_time = fr_end - last_frame;
-        frame_time /= 1000;
+        int64_t frame_time = (fr_end - last_frame)/1000;
+        if (g_use_dnn) printf("%ums (%.1ffps): cap=%dms, pre=%dms, dnn=%dms, enc=%dms\n", 
+            (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time, 
+            (int)((fr_cap-last_frame)/1000), (int)((fr_pre-fr_cap)/1000), (int)((fr_dnn-fr_pre)/1000), (int)((fr_enc-fr_dnn)/1000));
+        last_frame = fr_end;
+
 #if ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_INFO
         uint32_t avg_frame_time = ra_filter_run(&ra_filter, frame_time);
 #endif

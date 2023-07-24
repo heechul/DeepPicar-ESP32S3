@@ -539,26 +539,43 @@ extern void nomove();
 
 #include <Arduino.h>
 
+uint8_t rgb_image_data[INPUT_W * INPUT_H * 3];
+
+uint32_t rgb565torgb888(uint16_t color)
+{
+    uint32_t r, g, b;
+    r = (color >> 11) & 0x1F;
+    g = (color >> 5) & 0x3F;
+    b = color & 0x1F;
+    r = (r << 3) | (r >> 2);
+    g = (g << 2) | (g >> 4);
+    b = (b << 3) | (b >> 2);
+    return (r << 16) | (g << 8) | b;
+}
+
 // Begin the capture and wait for it to finish
-int GetImage(camera_fb_t * fb, uint8_t* image_data) 
+int GetImage(camera_fb_t * fb, float* image_data) 
 {
     // MicroPrintf("fb->width=%d, fb->height=%d, fb->len=%d\n", fb->width, fb->height, fb->len);
     // MicroPrintf("INPUT_W=%d, INPUT_H=%d\n", INPUT_W, INPUT_H);
+    MicroPrintf("fb: %dx%d-fmt:%d-len:%d INPUT: %dx%d", fb->width, fb->height, fb->format, fb->len, INPUT_W, INPUT_H);
+    // fmt2rgb888(fb->buf, fb->len, fb->format, (uint8_t *)rgb_image_data);
+    assert(fb->format == PIXFORMAT_RGB565);
 
-    if (fb->width == INPUT_W && fb->height == INPUT_H) {
-        memcpy(image_data, fb->buf, fb->len);
-    } else {
-        // Trimming Image
-        int post = 0;
-        int startx = (fb->width - INPUT_W) / 2;
-        int starty = (fb->height - INPUT_H);
-        for (int y = 0; y < INPUT_H; y++) {
-            for (int x = 0; x < INPUT_W; x++) {
-                int getPos = (starty + y) * fb->width + startx + x;
-                // MicroPrintf("input[%d]: fb->buf[%d]=%d\n", post, getPos, fb->buf[getPos]);
-                image_data[post] = fb->buf[getPos];
-                post++;
-            }
+    // Trimming Image
+    int post = 0;
+    int startx = (fb->width - INPUT_W) / 2;
+    int starty = (fb->height - INPUT_H);
+    for (int y = 0; y < INPUT_H; y++) {
+        for (int x = 0; x < INPUT_W; x++) {
+            int getPos = (starty + y) * fb->width + startx + x;
+            // MicroPrintf("input[%d]: fb->buf[%d]=%d\n", post, getPos, fb->buf[getPos]);
+            uint16_t color = ((uint16_t *)fb->buf)[getPos];
+            uint32_t rgb = rgb565torgb888(color);
+            image_data[post * 3 + 0] = ((rgb >> 16) & 0xFF) / 255.0;
+            image_data[post * 3 + 1] = ((rgb >> 8) & 0xFF) / 255.0;
+            image_data[post * 3 + 2] = (rgb & 0xFF) / 255.0;
+            post++;
         }
     }
     return 0;

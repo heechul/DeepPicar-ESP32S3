@@ -78,9 +78,9 @@ NeuralNetwork::NeuralNetwork()
     printf("tensor_arena: %p, input: %p\n", tensor_arena, input->data.uint8);
 } 
 
-uint8 *NeuralNetwork::getInputBuffer()
+float *NeuralNetwork::getInputBuffer()
 {
-    return input->data.uint8;
+    return input->data.f;
 }
 
 TfLiteStatus NeuralNetwork::predict()

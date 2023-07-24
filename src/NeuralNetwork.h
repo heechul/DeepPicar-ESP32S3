@@ -32,7 +32,7 @@ private:
     uint8_t *tensor_arena;
 
 public:
-    uint8 *getInputBuffer();
+    float *getInputBuffer();
     NeuralNetwork();
     TfLiteStatus predict();
     float getOutput();

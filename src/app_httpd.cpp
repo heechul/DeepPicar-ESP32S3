@@ -553,7 +553,7 @@ uint32_t rgb565torgb888(uint16_t color)
     return (r << 16) | (g << 8) | b;
 }
 
-// Begin the capture and wait for it to finish
+// prepare input image tensor
 int GetImage(camera_fb_t * fb, float* image_data) 
 {
     // MicroPrintf("fb->width=%d, fb->height=%d, fb->len=%d\n", fb->width, fb->height, fb->len);

@@ -60,7 +60,6 @@ def get_image(img):
     orig_h, orig_w, _ = img.shape
     scaled_h = int(orig_h * params.img_width / orig_w)
     scaled_w = params.img_width
-    print(scaled_w, scaled_h)
     scaled_img = cv2.resize(img, (scaled_w, scaled_h))
     # print(scaled_img.shape)
     # crop bottom center pixels of the model input size

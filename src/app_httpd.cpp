@@ -558,6 +558,35 @@ uint32_t rgb565torgb888(uint16_t color)
 }
 
 // prepare input image tensor
+#define USE_INT8 0
+#if USE_INT8==1
+int GetImage(camera_fb_t * fb, int8* image_data) 
+{
+    // MicroPrintf("fb: %dx%d-fmt:%d-len:%d INPUT: %dx%d", fb->width, fb->height, fb->format, fb->len, INPUT_W, INPUT_H);
+    // fmt2rgb888(fb->buf, fb->len, fb->format, (uint8_t *)rgb_image_data);
+    assert(fb->format == PIXFORMAT_RGB565);
+
+    // Trimming Image
+    int post = 0;
+    int startx = (fb->width - INPUT_W) / 2;
+    int starty = (fb->height - INPUT_H);
+    for (int y = 0; y < INPUT_H; y++) {
+        for (int x = 0; x < INPUT_W; x++) {
+            int getPos = (starty + y) * fb->width + startx + x;
+            // MicroPrintf("input[%d]: fb->buf[%d]=%d\n", post, getPos, fb->buf[getPos]);
+            uint16_t color = ((uint16_t *)fb->buf)[getPos];
+            uint32_t rgb = rgb565torgb888(color);
+
+            image_data[post * 3 + 2] = ((rgb >> 16) & 0xFF) - 128;
+            image_data[post * 3 + 1] = ((rgb >> 8) & 0xFF) - 128;
+            image_data[post * 3 + 0] = (rgb & 0xFF) - 128;
+            post++;
+        }
+    }
+    return 0;
+}
+
+#else
 int GetImage(camera_fb_t * fb, float* image_data) 
 {
     // MicroPrintf("fb: %dx%d-fmt:%d-len:%d INPUT: %dx%d", fb->width, fb->height, fb->format, fb->len, INPUT_W, INPUT_H);
@@ -574,15 +603,16 @@ int GetImage(camera_fb_t * fb, float* image_data)
             // MicroPrintf("input[%d]: fb->buf[%d]=%d\n", post, getPos, fb->buf[getPos]);
             uint16_t color = ((uint16_t *)fb->buf)[getPos];
             uint32_t rgb = rgb565torgb888(color);
-            image_data[post * 3 + 0] = ((rgb >> 16) & 0xFF) / 255.0;
+
+            image_data[post * 3 + 2] = ((rgb >> 16) & 0xFF) / 255.0;
             image_data[post * 3 + 1] = ((rgb >> 8) & 0xFF) / 255.0;
-            image_data[post * 3 + 2] = (rgb & 0xFF) / 255.0;
+            image_data[post * 3 + 0] = (rgb & 0xFF) / 255.0;
             post++;
         }
     }
     return 0;
 }
-
+#endif /* USE_INT8*/
 inline float rad2deg(float rad) 
 {
   return 180.0*rad/3.14;
@@ -680,7 +710,11 @@ static esp_err_t stream_handler(httpd_req_t *req)
             if (g_use_dnn) 
             {
                 long dur;
+#if USE_INT8==1
+                GetImage(fb, nn->getInputBufferInt8());
+#else
                 GetImage(fb, nn->getInputBuffer());
+#endif
                 fr_pre = esp_timer_get_time();
 
                 if (kTfLiteOk != nn->predict())

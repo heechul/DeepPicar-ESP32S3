@@ -33,6 +33,8 @@ private:
 
 public:
     float *getInputBuffer();
+    int8 *getInputBufferInt8();
+
     NeuralNetwork();
     TfLiteStatus predict();
     float getOutput();

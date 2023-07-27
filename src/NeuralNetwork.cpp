@@ -82,6 +82,10 @@ float *NeuralNetwork::getInputBuffer()
 {
     return input->data.f;
 }
+int8 *NeuralNetwork::getInputBufferInt8()
+{
+    return input->data.int8;
+}
 
 TfLiteStatus NeuralNetwork::predict()
 {

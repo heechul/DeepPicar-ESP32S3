@@ -23,6 +23,8 @@ inputdev = __import__(params.inputdev)
 ##########################################################
 use_dnn = False
 use_thread = True
+use_int8 = True
+
 view_video = False
 fpv_video = False
 enable_record = False
@@ -73,7 +75,6 @@ def preprocess(img):
     if params.img_channels == 1:
         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         img = np.reshape(img, (params.img_height, params.img_width, params.img_channels))
-    img = img / 255.
     return img
 
 def overlay_image(l_img, s_img, x_offset, y_offset):
@@ -130,11 +131,16 @@ parser.add_argument("-f", "--hz", help="control frequnecy", type=int)
 parser.add_argument("--fpvvideo", help="Take FPV video of DNN driving", action="store_true")
 parser.add_argument("--use_tensorflow", help="use the full tensorflow instead of tflite", action="store_true")
 parser.add_argument("--pre", help="preprocessing [resize|crop]", type=str, default="crop")
+parser.add_argument("--int8", help="use int8 quantized model", action="store_true")
+
 args = parser.parse_args()
 
 if args.dnn:
     print ("DNN is on")
     use_dnn = True
+if args.int8:
+    print ("use int8 quantized model")
+    use_int8 = True
 if args.throttle:
     print ("throttle = %d pct" % (args.throttle))
 if args.turnthresh:
@@ -149,6 +155,7 @@ if args.fpvvideo:
 
 print("period (sec):", period)
 print("preprocessing:", args.pre)
+print("use_int8:", use_int8)
 
 ##########################################################
 # import deeppicar's DNN model
@@ -257,7 +264,12 @@ while True:
     if use_dnn == True:
         # 1. machine input
         img = preprocess(frame)
-        img = np.expand_dims(img, axis=0).astype(np.float32)
+        if use_int8 == True:
+            img = img - 128
+            img = np.expand_dims(img, axis=0).astype(np.int8)
+        else:
+            img = img / 255.
+            img = np.expand_dims(img, axis=0).astype(np.float32)
         if args.use_tensorflow:
             angle = model.predict(img)[0]
         else:

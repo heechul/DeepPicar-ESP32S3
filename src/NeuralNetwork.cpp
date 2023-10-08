@@ -76,15 +76,24 @@ NeuralNetwork::NeuralNetwork()
     output = interpreter->output(0);
 
     printf("tensor_arena: %p, input: %p\n", tensor_arena, input->data.uint8);
+    printf("input->dims->size: %d\n", input->dims->size);
+    printf("input->dims->data[0]: %d\n", input->dims->data[0]);
+    printf("input->dims->data[1]: %d\n", input->dims->data[1]);
+    printf("input->dims->data[2]: %d\n", input->dims->data[2]);
+    printf("input->dims->data[3]: %d\n", input->dims->data[3]);
+    printf("input->type: %d\n", input->type);
+    printf("input->params.scale: %.3f\n", input->params.scale);
+    printf("input->params.zero_point: %d\n", input->params.zero_point);
+    
+    float scale = output->params.scale;
+    int zero_point = output->params.zero_point; 
+    printf("output scale=%.3f, zero_point=%d, angle=%.3f\n", scale, zero_point);
+
 } 
 
-float *NeuralNetwork::getInputBuffer()
+TfLiteTensor* NeuralNetwork::getInput()
 {
-    return input->data.f;
-}
-int8 *NeuralNetwork::getInputBufferInt8()
-{
-    return input->data.int8;
+    return input;
 }
 
 TfLiteStatus NeuralNetwork::predict()
@@ -92,7 +101,7 @@ TfLiteStatus NeuralNetwork::predict()
     return interpreter->Invoke();
 }
 
-float NeuralNetwork::getOutput()
+TfLiteTensor* NeuralNetwork::getOutput()
 {
-    return output->data.f[0];
+    return output;
 }

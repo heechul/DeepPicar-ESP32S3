@@ -1,17 +1,15 @@
 #!/usr/bin/env python
 ##########################################################
 # camera module selection
-#   "camera-webcam" "camera-null"
+#   "camera-esp32web" "camera-null"
 ##########################################################
 camera="camera-esp32web"
-# URL="http://192.168.1.194"
-# URL="http://192.168.1.200"
 URL="http://192.168.4.1"
+# camera="camera-null"
 
 ##########################################################
 # actuator selection
-#   "actuator-drv8835", "actuator-adafruit_hat"
-#   "actuator-null"
+#   "actuator-null" "actuator-esp32web"
 ##########################################################
 actuator="actuator-esp32web"
 
@@ -22,7 +20,7 @@ actuator="actuator-esp32web"
 inputdev="input-kbd"
 
 ##########################################################
-# input config 
+# model input config 
 ##########################################################
 img_width = 160
 img_height = 66

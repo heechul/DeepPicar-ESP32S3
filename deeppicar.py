@@ -60,7 +60,7 @@ def turn_off():
 # scaled crop. return img_height x img_width image
 def get_image(img):
     orig_h, orig_w, _ = img.shape
-    scaled_h = int(orig_h * params.img_width / orig_w)
+    scaled_h = int(params.img_width * orig_h / orig_w)
     scaled_w = params.img_width
     scaled_img = cv2.resize(img, (scaled_w, scaled_h))
     # print(scaled_img.shape)
@@ -71,10 +71,16 @@ def get_image(img):
  
 def preprocess(img):
     img = get_image(img)
-    # Convert to grayscale and readd channel dimension
+    # Convert to grayscale and read channel dimension
     if params.img_channels == 1:
         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         img = np.reshape(img, (params.img_height, params.img_width, params.img_channels))
+    if use_int8 == True:
+        img = img - 128
+        img = np.expand_dims(img, axis=0).astype(np.int8)
+    else:
+        img = img / 255.
+        img = np.expand_dims(img, axis=0).astype(np.float32)        
     return img
 
 def overlay_image(l_img, s_img, x_offset, y_offset):
@@ -184,7 +190,14 @@ else:
     interpreter.allocate_tensors()
     input_index = interpreter.get_input_details()[0]["index"]
     output_index = interpreter.get_output_details()[0]["index"]
-
+    # print(interpreter.get_output_details()[0])
+    input_type = interpreter.get_input_details()[0]['dtype']
+    print('input: ', input_type)
+    output_type = interpreter.get_output_details()[0]['dtype']
+    print('output: ', output_type)
+    quantization = interpreter.get_output_details()[0]['quantization']
+    (scale, zerop) = quantization
+    print('  zerop: ', zerop, 'scale: ', scale)
 
 # initlaize deeppicar modules
 actuator.init(args.throttle)
@@ -264,19 +277,21 @@ while True:
     if use_dnn == True:
         # 1. machine input
         img = preprocess(frame)
-        if use_int8 == True:
-            img = img - 128
-            img = np.expand_dims(img, axis=0).astype(np.int8)
-        else:
-            img = img / 255.
-            img = np.expand_dims(img, axis=0).astype(np.float32)
+        
+        # 2. machine output
         if args.use_tensorflow:
             angle = model.predict(img)[0]
-        else:
+        else: # tflite
             interpreter.set_tensor(input_index, img)
             interpreter.invoke()
-            angle = interpreter.get_tensor(output_index)[0][0]
-
+            if output_type == np.float32:
+                angle = interpreter.get_tensor(output_index)[0][0]
+            elif output_type == np.int8:
+                q = interpreter.get_tensor(output_index)[0][0]
+                angle = scale * (q - zerop)
+                print('dequantized output:', q, angle)
+        
+        # 3. actuator
         degree = rad2deg(angle)
         if degree <= -args.turnthresh:
             actuator.left()
@@ -336,5 +351,6 @@ while True:
 
 print ("Finish..")
 print ("Actuator latency measurements: {} trials".format(len(actuator_times)))
-print_stats(actuator_times)
+if len(actuator_times) > 0:
+    print_stats(actuator_times)
 turn_off()

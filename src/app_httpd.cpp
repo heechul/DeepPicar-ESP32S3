@@ -24,11 +24,14 @@
 #include "esp32-hal-log.h"
 #endif
 
+// prepare input image tensor
+#define USE_INT8 1
+
 #include "NeuralNetwork.h"
 extern NeuralNetwork *nn;
 
 // enable deeppicar dnn
-static int g_use_dnn = 0;
+static int g_use_dnn = 1;
 
 // Face Detection will not work on boards without (or with disabled) PSRAM
 #ifdef BOARD_HAS_PSRAM
@@ -557,10 +560,7 @@ uint32_t rgb565torgb888(uint16_t color)
     return (r << 16) | (g << 8) | b;
 }
 
-// prepare input image tensor
-#define USE_INT8 0
-#if USE_INT8==1
-int GetImage(camera_fb_t * fb, int8* image_data) 
+int GetImage(camera_fb_t * fb, void* data) 
 {
     // MicroPrintf("fb: %dx%d-fmt:%d-len:%d INPUT: %dx%d", fb->width, fb->height, fb->format, fb->len, INPUT_W, INPUT_H);
     // fmt2rgb888(fb->buf, fb->len, fb->format, (uint8_t *)rgb_image_data);
@@ -576,43 +576,23 @@ int GetImage(camera_fb_t * fb, int8* image_data)
             // MicroPrintf("input[%d]: fb->buf[%d]=%d\n", post, getPos, fb->buf[getPos]);
             uint16_t color = ((uint16_t *)fb->buf)[getPos];
             uint32_t rgb = rgb565torgb888(color);
-
+#if USE_INT8==1
+            int8_t *image_data = (int8_t *)data;
             image_data[post * 3 + 2] = ((rgb >> 16) & 0xFF) - 128;
             image_data[post * 3 + 1] = ((rgb >> 8) & 0xFF) - 128;
             image_data[post * 3 + 0] = (rgb & 0xFF) - 128;
-            post++;
-        }
-    }
-    return 0;
-}
-
 #else
-int GetImage(camera_fb_t * fb, float* image_data) 
-{
-    // MicroPrintf("fb: %dx%d-fmt:%d-len:%d INPUT: %dx%d", fb->width, fb->height, fb->format, fb->len, INPUT_W, INPUT_H);
-    // fmt2rgb888(fb->buf, fb->len, fb->format, (uint8_t *)rgb_image_data);
-    assert(fb->format == PIXFORMAT_RGB565);
-
-    // Trimming Image
-    int post = 0;
-    int startx = (fb->width - INPUT_W) / 2;
-    int starty = (fb->height - INPUT_H);
-    for (int y = 0; y < INPUT_H; y++) {
-        for (int x = 0; x < INPUT_W; x++) {
-            int getPos = (starty + y) * fb->width + startx + x;
-            // MicroPrintf("input[%d]: fb->buf[%d]=%d\n", post, getPos, fb->buf[getPos]);
-            uint16_t color = ((uint16_t *)fb->buf)[getPos];
-            uint32_t rgb = rgb565torgb888(color);
-
+            float *image_data = (float *)data;
             image_data[post * 3 + 2] = ((rgb >> 16) & 0xFF) / 255.0;
             image_data[post * 3 + 1] = ((rgb >> 8) & 0xFF) / 255.0;
             image_data[post * 3 + 0] = (rgb & 0xFF) / 255.0;
+#endif /* USE_INT8*/
             post++;
         }
     }
     return 0;
 }
-#endif /* USE_INT8*/
+
 inline float rad2deg(float rad) 
 {
   return 180.0*rad/3.14;
@@ -711,9 +691,10 @@ static esp_err_t stream_handler(httpd_req_t *req)
             {
                 long dur;
 #if USE_INT8==1
-                GetImage(fb, nn->getInputBufferInt8());
+                GetImage(fb, (void *)nn->getInput()->data.int8);
+                // memset((void *)(nn->getInput()->data.int8), -128, 3 * INPUT_W * INPUT_H);
 #else
-                GetImage(fb, nn->getInputBuffer());
+                GetImage(fb, (void *)nn->getInput()->data.f);
 #endif
                 fr_pre = esp_timer_get_time();
 
@@ -721,23 +702,33 @@ static esp_err_t stream_handler(httpd_req_t *req)
                 {
                     printf("Invoke failed.\n");
                 }
-                float angle = nn->getOutput();
+#if USE_INT8==1
+                int q = nn->getOutput()->data.int8[0];
+                float scale = nn->getOutput()->params.scale;
+                int zero_point = nn->getOutput()->params.zero_point;
+                float angle = (q - zero_point) * scale;
+#else
+                float angle = nn->getOutput()->data.f[0];
+#endif
                 fr_dnn = esp_timer_get_time();
 
                 int deg = (int)rad2deg(angle);
-                printf("DNN angle=%.3f(%d)\n", angle, deg);
+                printf("DNN angle=%.3f q=%d\n", angle, q);
 
                 if (deg < 10 and deg > -10) 
                 {
                     center();
+                    printf("center (%d) by CPU.\n", deg);
                 } 
                 else if (deg >= 10) 
                 {
                     right();
+                    printf("right (%d) by CPU\n", deg);
                 } 
                 else if (deg <= -10) 
                 {
                     left();
+                    printf("left (%d) by CPU\n", deg);
                 }
 
                 fb_data_t rfb;

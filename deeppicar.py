@@ -41,7 +41,7 @@ period = 0.05 # sec (=50ms)
 def deg2rad(deg):
     return deg * math.pi / 180.0
 def rad2deg(rad):
-    return 180.0 * rad / math.pi
+    return int(180.0 * rad / math.pi)
 
 def g_tick():
     t = time.time()
@@ -74,7 +74,7 @@ def preprocess(img):
     # Convert to grayscale and read channel dimension
     if params.img_channels == 1:
         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        img = np.reshape(img, (params.img_height, params.img_width, params.img_channels))
+        img = np.reshape(img, (params.img_height, params.img_width, 1))
     if use_int8 == True:
         img = img - 128
         img = np.expand_dims(img, axis=0).astype(np.int8)
@@ -210,6 +210,8 @@ start_ts = time.time()
 frame_arr = []
 angle_arr = []
 actuator_times = []
+degree = 0
+stext = ""
 
 # enter main loop
 while True:
@@ -217,10 +219,6 @@ while True:
         time.sleep(next(g))
     frame = camera.read_frame()
     ts = time.time()
-
-    if view_video == True:
-        cv2.imshow('frame', frame)
-        cv2.waitKey(1) & 0xFF
 
     # receive input (must be non blocking)
     ch = inputdev.read_single_event()
@@ -295,13 +293,14 @@ while True:
         degree = rad2deg(angle)
         if degree <= -args.turnthresh:
             actuator.left()
-            print ("left (%d) by CPU" % (degree))
+            stext = "{:3d} {}".format(degree, "left")
         elif degree < args.turnthresh and degree > -args.turnthresh:
             actuator.center()
-            print ("center (%d) by CPU" % (degree))
+            stext = "{:3d} {}".format(degree, "center")
         elif degree >= args.turnthresh:
             actuator.right()
-            print ("right (%d) by CPU" % (degree))
+            stext = "{:3d} {}".format(degree, "right")
+        print (stext)
 
     dur = time.time() - ts
     if dur > period:
@@ -336,9 +335,8 @@ while True:
             drawer.text((0, 0), "Frame #{}".format(frame_id), fill=textColor)
             drawer.text((0, 10), "Angle:{}".format(angle), fill=textColor)
             newImage = cv2.cvtColor(np.array(newImage), cv2.COLOR_BGR2RGBA)
-            frame = overlay_image(frame,
-                                     newImage,
-                                     x_offset = 0, y_offset = 0)
+            frame = overlay_image(frame, newImage, x_offset = 0, y_offset = 0)
+        
         # write video stream
         vidfile.write(frame)
         #img_name = "cal_images/opencv_frame_{}.png".format(frame_id)
@@ -348,6 +346,19 @@ while True:
             break
         print ("%.3f %d %.3f %d(ms)" %
            (ts, frame_id, angle, int((time.time() - ts)*1000)))
+    
+    if view_video == True:
+        if use_dnn == True:
+            textColor = (255,0,0)
+            bgColor = (0,0,0)
+            newImage = Image.new('RGBA', (100, 20), bgColor)
+            drawer = ImageDraw.Draw(newImage)
+            drawer.text((0, 0), stext, fill=textColor)
+            newImage = cv2.cvtColor(np.array(newImage), cv2.COLOR_BGR2RGBA)
+            frame = overlay_image(frame, newImage, x_offset = 0, y_offset = 0)
+        cv2.imshow('frame', frame)
+        cv2.waitKey(1) & 0xFF
+
 
 print ("Finish..")
 print ("Actuator latency measurements: {} trials".format(len(actuator_times)))

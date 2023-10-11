@@ -12,7 +12,7 @@ URL="http://192.168.4.1"
 #   "actuator-null" "actuator-esp32web"
 ##########################################################
 actuator="actuator-esp32web"
-
+# actuator="actuator-null"
 ##########################################################
 # intputdev selection
 #   "input-kbd", "input-joystick", "input-web"

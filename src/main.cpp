@@ -43,8 +43,8 @@ NeuralNetwork *nn;
 const char* ssid = "ESP32";
 const char* password = "123456789"; 
 #else
-const char* ssid = "ATTCEFWtdS";
-const char* password = "brx=2ktt=e=p";
+const char* ssid = "";
+const char* password = "";
 #endif
 
 void startCameraServer();

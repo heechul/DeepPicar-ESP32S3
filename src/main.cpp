@@ -171,7 +171,7 @@ void setup() {
   startCameraServer();
 
   Serial.print("Camera Ready! Use 'http://");
-  Serial.print(WiFi.localIP());
+  Serial.print(WiFi.softAPIP());
   Serial.println("' to connect");
   
   // sets the pins as outputs:

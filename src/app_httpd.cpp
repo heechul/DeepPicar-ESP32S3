@@ -327,6 +327,12 @@ static esp_err_t capture_handler(httpd_req_t *req)
 #define INPUT_W 160
 #define INPUT_H 66
 
+#define DEBUG_TFLITE 1
+
+#if DEBUG_TFLITE==1
+#include "img.h"  // Use a static image for debugging
+#endif
+
 extern void left();
 extern void right();
 extern void center();
@@ -464,11 +470,14 @@ static esp_err_t stream_handler(httpd_req_t *req)
             if (g_use_dnn) 
             {
                 long dur;
-                // memset((void *)fb->buf, 0, fb->len); printf("Black image\n");
-                // memset((void *)fb->buf, 0xFF, fb->len); printf("White image\n");
+#if DEBUG_TFLITE==0
                 GetImage(fb, nn->getInput());
-                // memset((void *)(nn->getInput()->data.int8), -128, 3 * INPUT_W * INPUT_H);
-
+#else
+                // Use a static image for debugging
+                memcpy(nn->getInput()->data.int8, img_data, sizeof(img_data));
+                printf("input: %d %d %d...\n", 
+                    nn->getInput()->data.int8[0], nn->getInput()->data.int8[1], nn->getInput()->data.int8[2]);
+#endif
                 fr_pre = esp_timer_get_time();
 
                 if (kTfLiteOk != nn->predict())

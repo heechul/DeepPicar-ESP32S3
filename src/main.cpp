@@ -64,7 +64,8 @@ int pwmChannel = 0;
 void setup() {
 
   Serial.begin(115200);
-  Serial.setDebugOutput(true);
+  // while(!Serial); // When the serial monitor is turned on, the program starts to execute
+  Serial.setDebugOutput(false);
   Serial.println();
 
   camera_config_t config;

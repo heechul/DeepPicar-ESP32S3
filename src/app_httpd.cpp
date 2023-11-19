@@ -327,7 +327,7 @@ static esp_err_t capture_handler(httpd_req_t *req)
 #define INPUT_W 160
 #define INPUT_H 66
 
-#define DEBUG_TFLITE 1
+#define DEBUG_TFLITE 0
 
 #if DEBUG_TFLITE==1
 #include "img.h"  // Use a static image for debugging

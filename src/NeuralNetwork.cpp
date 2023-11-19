@@ -87,7 +87,7 @@ NeuralNetwork::NeuralNetwork()
     
     float scale = output->params.scale;
     int zero_point = output->params.zero_point; 
-    printf("output scale=%.3f, zero_point=%d, angle=%.3f\n", scale, zero_point);
+    printf("output scale=%f, zero_point=%d\n", scale, zero_point);
 
 } 
 

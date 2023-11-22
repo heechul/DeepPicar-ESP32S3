@@ -345,7 +345,6 @@ extern void nomove();
 
 #include <Arduino.h>
 
-// uint8_t rgb_image_data[INPUT_W * INPUT_H * 3];
 
 uint32_t rgb565torgb888(uint16_t color)
 {
@@ -360,36 +359,52 @@ uint32_t rgb565torgb888(uint16_t color)
     return (r << 16) | (g << 8) | b;
 }
 
+uint8_t *rgb_image_data = NULL;
+
 int GetImage(camera_fb_t * fb, TfLiteTensor* input) 
 {
-    // MicroPrintf("fb: %dx%d-fmt:%d-len:%d INPUT: %dx%d", fb->width, fb->height, fb->format, fb->len, INPUT_W, INPUT_H);
-    // fmt2rgb888(fb->buf, fb->len, fb->format, (uint8_t *)rgb_image_data);
+    MicroPrintf("fb: %dx%d-fmt:%d-len:%d INPUT: %dx%d", fb->width, fb->height, fb->format, fb->len, INPUT_W, INPUT_H);
     assert(fb->format == PIXFORMAT_RGB565);
+
+    if (rgb_image_data == NULL) {
+        rgb_image_data = (uint8_t *)malloc(fb->width * fb->height * 3);
+        assert(rgb_image_data != NULL);
+    }
+    bool ret = fmt2rgb888(fb->buf, fb->len, fb->format, (uint8_t *)rgb_image_data);
+    assert(ret == true);
 
     // Trimming Image
     int post = 0;
     int startx = (fb->width - INPUT_W) / 2;
     int starty = (fb->height - INPUT_H);
+    
+    printf("startx=%d starty=%d\n", startx, starty);
+
     for (int y = 0; y < INPUT_H; y++) {
         for (int x = 0; x < INPUT_W; x++) {
             int getPos = (starty + y) * fb->width + startx + x;
             // MicroPrintf("input[%d]: fb->buf[%d]=%d\n", post, getPos, fb->buf[getPos]);
-            uint16_t color = ((uint16_t *)fb->buf)[getPos];
-            uint32_t rgb = rgb565torgb888(color);
+            // uint16_t color = ((uint16_t *)fb->buf)[getPos];
+            // uint32_t rgb = rgb565torgb888(color);
+            uint8_t r = rgb_image_data[getPos*3];
+            uint8_t g = rgb_image_data[getPos*3+1];
+            uint8_t b = rgb_image_data[getPos*3+2];
 #if USE_INT8==1
             int8_t *image_data = input->data.int8;
-            image_data[post * 3 + 0] = ((rgb >> 16) & 0xFF) - 128;  // R
-            image_data[post * 3 + 1] = ((rgb >> 8) & 0xFF) - 128;   // G
-            image_data[post * 3 + 2] = (rgb & 0xFF) - 128;          // B
+            image_data[post * 3 + 0] = (int)r - 128;  // R
+            image_data[post * 3 + 1] = (int)g - 128;  // G
+            image_data[post * 3 + 2] = (int)b - 128;  // B
+            if (post < 3) printf("input[%d]: %d %d %d\n", post, image_data[post * 3 + 0] + 128, image_data[post * 3 + 1] + 128, image_data[post * 3 + 2] + 128);
 #else
             float *image_data = input->data.f;
-            image_data[post * 3 + 0] = ((rgb >> 16) & 0xFF) / 255.0;
-            image_data[post * 3 + 1] = ((rgb >> 8) & 0xFF) / 255.0;
-            image_data[post * 3 + 2] = (rgb & 0xFF) / 255.0;
+            image_data[post * 3 + 0] = (float) r / 255.0;
+            image_data[post * 3 + 1] = (float) g / 255.0;
+            image_data[post * 3 + 2] = (float) b / 255.0;
 #endif /* USE_INT8*/
             post++;
         }
     }
+
     return 0;
 }
 

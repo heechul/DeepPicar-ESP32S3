@@ -64,7 +64,7 @@ int pwmChannel = 0;
 void setup() {
 
   Serial.begin(115200);
-  while(!Serial); // When the serial monitor is turned on, the program starts to execute
+  // while(!Serial); // When the serial monitor is turned on, the program starts to execute
   Serial.setDebugOutput(false);
   Serial.println();
 

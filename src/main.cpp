@@ -64,7 +64,7 @@ int pwmChannel = 0;
 void setup() {
 
   Serial.begin(115200);
-  // while(!Serial); // When the serial monitor is turned on, the program starts to execute
+  while(!Serial); // When the serial monitor is turned on, the program starts to execute
   Serial.setDebugOutput(false);
   Serial.println();
 
@@ -88,7 +88,7 @@ void setup() {
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
-  config.frame_size = FRAMESIZE_UXGA;
+  config.frame_size = FRAMESIZE_QQVGA;
   // config.pixel_format = PIXFORMAT_JPEG; // for streaming
   config.pixel_format = PIXFORMAT_RGB565; // for face detection/recognition
   config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
@@ -116,17 +116,16 @@ void setup() {
 #endif
   }
 
-#if defined(CAMERA_MODEL_ESP_EYE)
-  pinMode(13, INPUT_PULLUP);
-  pinMode(14, INPUT_PULLUP);
-#endif
-
   // camera init
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
     Serial.printf("Camera init failed with error 0x%x", err);
     return;
+  } else {
+    Serial.println("Camera init success!");
   }
+
+  Serial.printf("Camera info: framesize=%d, pixel_format=%d\n", config.frame_size, config.pixel_format);
 
   sensor_t * s = esp_camera_sensor_get();
   // initial sensors are flipped vertically and colors are a bit saturated
@@ -135,19 +134,6 @@ void setup() {
     s->set_brightness(s, 1); // up the brightness just a bit
     s->set_saturation(s, -2); // lower the saturation
   }
-  // drop down frame size for higher initial frame rate
-  if(config.pixel_format == PIXFORMAT_JPEG){
-    s->set_framesize(s, FRAMESIZE_QVGA);
-  }
-
-#if defined(CAMERA_MODEL_M5STACK_WIDE) || defined(CAMERA_MODEL_M5STACK_ESP32CAM)
-  s->set_vflip(s, 1);
-  s->set_hmirror(s, 1);
-#endif
-
-#if defined(CAMERA_MODEL_ESP32S3_EYE)
-  s->set_vflip(s, 1);
-#endif
 
 // Setup LED FLash if LED pin is defined in camera_pins.h
 #if defined(LED_GPIO_NUM)
@@ -157,6 +143,9 @@ void setup() {
 #if SETUP_AP==1
   Serial.print("Setting AP (Access Point)…");
   WiFi.softAP(ssid, password);
+  Serial.print("Camera Ready! Use 'http://");
+  Serial.print(WiFi.softAPIP());
+  Serial.println("' to connect");
 #else
   WiFi.begin(ssid, password);
   WiFi.setSleep(false);
@@ -167,14 +156,13 @@ void setup() {
   }
   Serial.println("");
   Serial.println("WiFi connected");
+  Serial.print("Camera Ready! Use 'http://");
+  Serial.print(WiFi.localIP());
+  Serial.println("' to connect");
 #endif
 
   startCameraServer();
 
-  Serial.print("Camera Ready! Use 'http://");
-  Serial.print(WiFi.softAPIP());
-  Serial.println("' to connect");
-  
   // sets the pins as outputs:
   pinMode(f_Pin, OUTPUT);
   pinMode(b_Pin, OUTPUT);

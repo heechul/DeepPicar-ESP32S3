@@ -68,12 +68,12 @@ def get_image(img):
     # crop bottom center pixels of the model input size
     startx = int((scaled_w - params.img_width) * 0.5);
     starty = int((scaled_h - params.img_height) * 1.0);
-    print("startx, starty: ", startx, starty)
+    # print("startx, starty: ", startx, starty)
     return scaled_img[starty:starty+params.img_height, startx:startx+params.img_width,:]
  
 def preprocess(img):
     img = get_image(img)
-    print("cropped img info: ", img.shape, img.dtype, img.min(), img.max(), img[0][0], img[0][1], img[0][2])
+    # print("cropped img info: ", img.shape, img.dtype, img.min(), img.max(), img[0][0], img[0][1], img[0][2])
 
     # Convert to grayscale and read channel dimension
     if params.img_channels == 1:
@@ -291,7 +291,7 @@ while True:
             elif output_type == np.int8:
                 q = interpreter.get_tensor(output_index)[0][0]
                 angle = scale * (q - zerop)
-                print('dequantized output:', q, angle, rad2deg(angle))
+                # print('dequantized output:', q, angle, rad2deg(angle))
         
         # 3. actuator
         degree = rad2deg(angle)

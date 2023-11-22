@@ -348,30 +348,54 @@ extern void nomove();
 
 uint32_t rgb565torgb888(uint16_t color)
 {
+    uint8_t hb, lb;
     uint32_t r, g, b;
-    r = g = b = 0; 
-    r = (color >> 11) & 0x1F;
-    g = (color >> 5) & 0x3F;
-    b = color & 0x1F;
-    r = (r << 3) | (r >> 2);
-    g = (g << 2) | (g >> 4);
-    b = (b << 3) | (b >> 2);
+
+    lb = (color >> 8) & 0xFF;
+    hb = color & 0xFF;
+
+    r = (lb & 0x1F) << 3;
+    g = ((hb & 0x07) << 5) | ((lb & 0xE0) >> 3);
+    b = (hb & 0xF8);
+    
     return (r << 16) | (g << 8) | b;
 }
 
-uint8_t *rgb_image_data = NULL;
+bool myfmt2rgb888(const uint8_t *src_buf, size_t src_len, pixformat_t format, uint8_t *rgb_buf)
+{
+    int pix_count = 0;
+
+    if (format == PIXFORMAT_RGB565)
+    {
+        int i;
+        uint8_t hb, lb;
+        pix_count = src_len / 2;
+        for(i=0; i<pix_count; i++) {
+            hb = *src_buf++;
+            lb = *src_buf++;
+            *rgb_buf++ = (lb & 0x1F) << 3;
+            *rgb_buf++ = (hb & 0x07) << 5 | (lb & 0xE0) >> 3;
+            *rgb_buf++ = hb & 0xF8;
+        }
+
+        return true;
+    }
+    return false;
+}
+
+// uint8_t *rgb_image_data = NULL;
 
 int GetImage(camera_fb_t * fb, TfLiteTensor* input) 
 {
-    MicroPrintf("fb: %dx%d-fmt:%d-len:%d INPUT: %dx%d", fb->width, fb->height, fb->format, fb->len, INPUT_W, INPUT_H);
+    // MicroPrintf("fb: %dx%d-fmt:%d-len:%d INPUT: %dx%d", fb->width, fb->height, fb->format, fb->len, INPUT_W, INPUT_H);
     assert(fb->format == PIXFORMAT_RGB565);
 
-    if (rgb_image_data == NULL) {
-        rgb_image_data = (uint8_t *)malloc(fb->width * fb->height * 3);
-        assert(rgb_image_data != NULL);
-    }
-    bool ret = fmt2rgb888(fb->buf, fb->len, fb->format, (uint8_t *)rgb_image_data);
-    assert(ret == true);
+    // if (rgb_image_data == NULL) {
+    //     rgb_image_data = (uint8_t *)malloc(fb->width * fb->height * 3);
+    //     assert(rgb_image_data != NULL);
+    // }
+    // bool ret = myfmt2rgb888(fb->buf, fb->len, fb->format, (uint8_t *)rgb_image_data);
+    // assert(ret == true);
 
     // Trimming Image
     int post = 0;
@@ -384,17 +408,17 @@ int GetImage(camera_fb_t * fb, TfLiteTensor* input)
         for (int x = 0; x < INPUT_W; x++) {
             int getPos = (starty + y) * fb->width + startx + x;
             // MicroPrintf("input[%d]: fb->buf[%d]=%d\n", post, getPos, fb->buf[getPos]);
-            // uint16_t color = ((uint16_t *)fb->buf)[getPos];
-            // uint32_t rgb = rgb565torgb888(color);
-            uint8_t r = rgb_image_data[getPos*3];
-            uint8_t g = rgb_image_data[getPos*3+1];
-            uint8_t b = rgb_image_data[getPos*3+2];
+            uint16_t color = ((uint16_t *)fb->buf)[getPos];
+            uint32_t rgb = rgb565torgb888(color);
+            uint8_t r = (rgb >> 16) & 0xFF; // rgb_image_data[getPos*3];
+            uint8_t g = (rgb >>  8) & 0xFF; // rgb_image_data[getPos*3+1];
+            uint8_t b = (rgb >>  0) & 0xFF; // rgb_image_data[getPos*3+2];
 #if USE_INT8==1
             int8_t *image_data = input->data.int8;
             image_data[post * 3 + 0] = (int)r - 128;  // R
             image_data[post * 3 + 1] = (int)g - 128;  // G
             image_data[post * 3 + 2] = (int)b - 128;  // B
-            if (post < 3) printf("input[%d]: %d %d %d\n", post, image_data[post * 3 + 0] + 128, image_data[post * 3 + 1] + 128, image_data[post * 3 + 2] + 128);
+            // if (post < 3) printf("input[%d]: %d %d %d\n", post, image_data[post * 3 + 0] + 128, image_data[post * 3 + 1] + 128, image_data[post * 3 + 2] + 128);
 #else
             float *image_data = input->data.f;
             image_data[post * 3 + 0] = (float) r / 255.0;

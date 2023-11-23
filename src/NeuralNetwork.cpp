@@ -13,7 +13,7 @@
 #include <esp_attr.h>
 #include <Arduino.h>
 
-int kTensorArenaSize = 1024 * 1024;
+int kTensorArenaSize = 128 * 1024;
 
 NeuralNetwork::NeuralNetwork()
 {
@@ -46,12 +46,21 @@ NeuralNetwork::NeuralNetwork()
     micro_op_resolver.AddQuantize();
     micro_op_resolver.AddDequantize();
 
+    tensor_arena = (uint8_t *)heap_caps_malloc(kTensorArenaSize, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (tensor_arena != NULL) {
+        MicroPrintf("allocated on SRAM\n");
+        goto success;   
+    }
     tensor_arena = (uint8_t *)heap_caps_malloc(kTensorArenaSize, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (tensor_arena == NULL)
-    {
+    if (tensor_arena != NULL) {
+        MicroPrintf("allocated on PSRAM\n");
+        goto success;   
+    } else {
         printf("Couldn't allocate memory of %d bytes\n", kTensorArenaSize);
         return;
     }
+success:
+    printf("tensor_arena: %p\n", tensor_arena);
     printf("Free heap: %d\n", ESP.getFreeHeap());
 
     // Build an interpreter to run the model with.

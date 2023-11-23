@@ -402,7 +402,7 @@ int GetImage(camera_fb_t * fb, TfLiteTensor* input)
     int startx = (fb->width - INPUT_W) / 2;
     int starty = (fb->height - INPUT_H);
     
-    printf("startx=%d starty=%d\n", startx, starty);
+    // printf("startx=%d starty=%d\n", startx, starty);
 
     for (int y = 0; y < INPUT_H; y++) {
         for (int x = 0; x < INPUT_W; x++) {
@@ -623,7 +623,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
 #endif
 
         int64_t frame_time = (fr_end - last_frame)/1000;
-        if (0 /* g_use_dnn */) printf("  %ums (%.1ffps): cap=%dms, pre=%dms, dnn=%dms, enc=%dms\n", 
+        if (g_use_dnn) printf("  %ums (%.1ffps): cap=%dms, pre=%dms, dnn=%dms, enc=%dms\n", 
             (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time, 
             (int)((fr_cap-last_frame)/1000), (int)((fr_pre-fr_cap)/1000), (int)((fr_dnn-fr_pre)/1000), (int)((fr_enc-fr_dnn)/1000));
 

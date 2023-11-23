@@ -3,9 +3,10 @@
 # camera module selection
 #   "camera-esp32web" "camera-null"
 ##########################################################
-camera="camera-esp32web"
 URL="http://192.168.4.1"
-# camera="camera-null"
+
+# camera="camera-esp32web"
+camera="camera-null"
 
 ##########################################################
 # actuator selection

@@ -34,3 +34,5 @@ float execution time profile:
 int8  execution time profile: 
 223ms (4.5fps): cap=0ms, pre=3ms, dnn=198ms, enc=19ms
 
+int8 & internal SRAM buffer execution time profile:
+123ms (8.1fps): cap=0ms, pre=2ms, dnn=98ms, enc=20ms

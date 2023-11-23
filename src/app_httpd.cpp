@@ -24,15 +24,6 @@
 #include "esp32-hal-log.h"
 #endif
 
-// prepare input image tensor
-#define USE_INT8 1
-
-#include "NeuralNetwork.h"
-extern NeuralNetwork *nn;
-
-// enable deeppicar dnn
-static int g_use_dnn = 0;
-
 // Face Detection will not work on boards without (or with disabled) PSRAM
 #ifdef BOARD_HAS_PSRAM
 #define CONFIG_ESP_FACE_DETECT_ENABLED 0
@@ -94,6 +85,7 @@ int led_duty = 0;
 bool isStreaming = false;
 
 #endif
+
 
 typedef struct
 {
@@ -323,15 +315,7 @@ static esp_err_t capture_handler(httpd_req_t *req)
         return res;
 }
 
-// input image size
-#define INPUT_W 160
-#define INPUT_H 66
-
-#define DEBUG_TFLITE 0
-
-#if DEBUG_TFLITE==1
-#include "img.h"  // Use a static image for debugging
-#endif
+#include <Arduino.h>
 
 extern void left();
 extern void right();
@@ -343,116 +327,7 @@ extern void throttledown();
 extern void set_throttle(int);
 extern void nomove();
 
-#include <Arduino.h>
-
-
-uint32_t rgb565torgb888(uint16_t color)
-{
-    uint8_t hb, lb;
-    uint32_t r, g, b;
-
-    lb = (color >> 8) & 0xFF;
-    hb = color & 0xFF;
-
-    r = (lb & 0x1F) << 3;
-    g = ((hb & 0x07) << 5) | ((lb & 0xE0) >> 3);
-    b = (hb & 0xF8);
-    
-    return (r << 16) | (g << 8) | b;
-}
-
-bool myfmt2rgb888(const uint8_t *src_buf, size_t src_len, pixformat_t format, uint8_t *rgb_buf)
-{
-    int pix_count = 0;
-
-    if (format == PIXFORMAT_RGB565)
-    {
-        int i;
-        uint8_t hb, lb;
-        pix_count = src_len / 2;
-        for(i=0; i<pix_count; i++) {
-            hb = *src_buf++;
-            lb = *src_buf++;
-            *rgb_buf++ = (lb & 0x1F) << 3;
-            *rgb_buf++ = (hb & 0x07) << 5 | (lb & 0xE0) >> 3;
-            *rgb_buf++ = hb & 0xF8;
-        }
-
-        return true;
-    }
-    return false;
-}
-
-// uint8_t *rgb_image_data = NULL;
-
-int GetImage(camera_fb_t * fb, TfLiteTensor* input) 
-{
-    // MicroPrintf("fb: %dx%d-fmt:%d-len:%d INPUT: %dx%d", fb->width, fb->height, fb->format, fb->len, INPUT_W, INPUT_H);
-    assert(fb->format == PIXFORMAT_RGB565);
-
-    // if (rgb_image_data == NULL) {
-    //     rgb_image_data = (uint8_t *)malloc(fb->width * fb->height * 3);
-    //     assert(rgb_image_data != NULL);
-    // }
-    // bool ret = myfmt2rgb888(fb->buf, fb->len, fb->format, (uint8_t *)rgb_image_data);
-    // assert(ret == true);
-
-    // Trimming Image
-    int post = 0;
-    int startx = (fb->width - INPUT_W) / 2;
-    int starty = (fb->height - INPUT_H);
-    
-    // printf("startx=%d starty=%d\n", startx, starty);
-
-    for (int y = 0; y < INPUT_H; y++) {
-        for (int x = 0; x < INPUT_W; x++) {
-            int getPos = (starty + y) * fb->width + startx + x;
-            // MicroPrintf("input[%d]: fb->buf[%d]=%d\n", post, getPos, fb->buf[getPos]);
-            uint16_t color = ((uint16_t *)fb->buf)[getPos];
-            uint32_t rgb = rgb565torgb888(color);
-            uint8_t r = (rgb >> 16) & 0xFF; // rgb_image_data[getPos*3];
-            uint8_t g = (rgb >>  8) & 0xFF; // rgb_image_data[getPos*3+1];
-            uint8_t b = (rgb >>  0) & 0xFF; // rgb_image_data[getPos*3+2];
-#if USE_INT8==1
-            int8_t *image_data = input->data.int8;
-            image_data[post * 3 + 0] = (int)r - 128;  // R
-            image_data[post * 3 + 1] = (int)g - 128;  // G
-            image_data[post * 3 + 2] = (int)b - 128;  // B
-            // if (post < 3) printf("input[%d]: %d %d %d\n", post, image_data[post * 3 + 0] + 128, image_data[post * 3 + 1] + 128, image_data[post * 3 + 2] + 128);
-#else
-            float *image_data = input->data.f;
-            image_data[post * 3 + 0] = (float) r / 255.0;
-            image_data[post * 3 + 1] = (float) g / 255.0;
-            image_data[post * 3 + 2] = (float) b / 255.0;
-#endif /* USE_INT8*/
-            post++;
-        }
-    }
-
-    return 0;
-}
-
-inline float rad2deg(float rad) 
-{
-  return 180.0*rad/3.14;
-}
-
-// steering
-#define CENTER 0
-#define RIGHT 1
-#define LEFT 2
-
-int GetAction(float rad)
-{
-    int deg = (int)rad2deg(rad);
-    if (deg < 10 and deg > -10)
-        return CENTER;
-    else if (deg >= 10)
-        return RIGHT;
-    else if (deg < -10)
-        return LEFT;
-    return -1;
-}
+extern int g_use_dnn; // defined in src/main.cpp
 
 static esp_err_t stream_handler(httpd_req_t *req)
 {
@@ -506,62 +381,19 @@ static esp_err_t stream_handler(httpd_req_t *req)
                     (fb->format == PIXFORMAT_YUV422) ? "YUV422" : "UNKNOWN");
             }
 
-            if (g_use_dnn) 
-            {
-                long dur;
-#if DEBUG_TFLITE==0
-                GetImage(fb, nn->getInput());
-#else
-                // Use a static image for debugging
-                memcpy(nn->getInput()->data.int8, img_data, sizeof(img_data));
-                printf("input: %d %d %d...\n", 
-                    nn->getInput()->data.int8[0], nn->getInput()->data.int8[1], nn->getInput()->data.int8[2]);
-#endif
-                fr_pre = esp_timer_get_time();
+            // if (g_use_dnn) 
+            // {
+            //     long dur;
+            //     fb_data_t rfb;
+            //     rfb.width = fb->width;
+            //     rfb.height = fb->height;
+            //     rfb.data = fb->buf;
+            //     rfb.bytes_per_pixel = 2;
+            //     rfb.format = FB_RGB565;
 
-                if (kTfLiteOk != nn->predict())
-                {
-                    printf("Invoke failed.\n");
-                }
-#if USE_INT8==1
-                int q = nn->getOutput()->data.int8[0];
-                float scale = nn->getOutput()->params.scale;
-                int zero_point = nn->getOutput()->params.zero_point;
-                float angle = (q - zero_point) * scale;
-#else
-                float angle = nn->getOutput()->data.f[0];
-#endif
-                fr_dnn = esp_timer_get_time();
-
-                int deg = (int)rad2deg(angle);
-                
-                if (deg < 10 and deg > -10) 
-                {
-                    center();
-                    printf("center (%d) by CPU", deg);
-                } 
-                else if (deg >= 10) 
-                {
-                    right();
-                    printf("right (%d) by CPU", deg);
-                } 
-                else if (deg <= -10) 
-                {
-                    left();
-                    printf("left (%d) by CPU", deg);
-                }
-                printf(": angle=%.3f q=%d\n", angle, q);
-
-                fb_data_t rfb;
-                rfb.width = fb->width;
-                rfb.height = fb->height;
-                rfb.data = fb->buf;
-                rfb.bytes_per_pixel = 2;
-                rfb.format = FB_RGB565;
-
-                fb_gfx_printf(&rfb, 0, 0, COLOR_BLUE, "AI: %3d %s", deg, 
-                    (deg < 10 and deg > -10) ? "C" : (deg >= 10) ? "R" : "L");
-            }
+            //     fb_gfx_printf(&rfb, 0, 0, COLOR_BLUE, "AI: %3d %s", deg, 
+            //         (deg < 10 and deg > -10) ? "C" : (deg >= 10) ? "R" : "L");
+            // }
 
             if (fb->format != PIXFORMAT_JPEG)
             {
@@ -623,10 +455,8 @@ static esp_err_t stream_handler(httpd_req_t *req)
 #endif
 
         int64_t frame_time = (fr_end - last_frame)/1000;
-        if (g_use_dnn) printf("  %ums (%.1ffps): cap=%dms, pre=%dms, dnn=%dms, enc=%dms\n", 
-            (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time, 
-            (int)((fr_cap-last_frame)/1000), (int)((fr_pre-fr_cap)/1000), (int)((fr_dnn-fr_pre)/1000), (int)((fr_enc-fr_dnn)/1000));
-
+        if (0 /* g_use_dnn */) printf("  %ums (%.1ffps)\n", 
+            (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time);
         last_frame = fr_end;
 
 #if ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_INFO

@@ -2,35 +2,9 @@
 #include <WiFi.h>
 #include "NeuralNetwork.h"
 
-NeuralNetwork *nn;
+NeuralNetwork *g_nn;
 
-//
-// WARNING!!! PSRAM IC required for UXGA resolution and high JPEG quality
-//            Ensure ESP32 Wrover Module or other board with PSRAM is selected
-//            Partial images will be transmitted if image exceeds buffer size
-//
-//            You must select partition scheme from the board menu that has at least 3MB APP space.
-//            Face Recognition is DISABLED for ESP32 and ESP32-S2, because it takes up from 15 
-//            seconds to process single frame. Face Detection is ENABLED if PSRAM is enabled as well
-
-// ===================
-// Select camera model
-// ===================
-//#define CAMERA_MODEL_WROVER_KIT // Has PSRAM
-//#define CAMERA_MODEL_ESP_EYE // Has PSRAM
-//#define CAMERA_MODEL_ESP32S3_EYE // Has PSRAM
-//#define CAMERA_MODEL_M5STACK_PSRAM // Has PSRAM
-//#define CAMERA_MODEL_M5STACK_V2_PSRAM // M5Camera version B Has PSRAM
-//#define CAMERA_MODEL_M5STACK_WIDE // Has PSRAM
-//#define CAMERA_MODEL_M5STACK_ESP32CAM // No PSRAM
-//#define CAMERA_MODEL_M5STACK_UNITCAM // No PSRAM
-//#define CAMERA_MODEL_AI_THINKER // Has PSRAM
-//#define CAMERA_MODEL_TTGO_T_JOURNAL // No PSRAM
 #define CAMERA_MODEL_XIAO_ESP32S3 // Has PSRAM
-// ** Espressif Internal Boards **
-//#define CAMERA_MODEL_ESP32_CAM_BOARD
-//#define CAMERA_MODEL_ESP32S2_CAM_BOARD
-//#define CAMERA_MODEL_ESP32S3_CAM_LCD
 
 #include "camera_pins.h"
 
@@ -64,7 +38,7 @@ int pwmChannel = 0;
 void setup() {
 
   Serial.begin(115200);
-  // while(!Serial); // When the serial monitor is turned on, the program starts to execute
+  while(!Serial); // When the serial monitor is turned on, the program starts to execute
   Serial.setDebugOutput(false);
   Serial.println();
 
@@ -178,7 +152,7 @@ void setup() {
   ledcWrite(pwmChannel, 0);
 
   // register pilotnet algo
-  nn = new NeuralNetwork();
+  g_nn = new NeuralNetwork();
 
 }
 
@@ -223,7 +197,180 @@ void nomove() {
   ledcWrite(pwmChannel, 0);  
 }
 
+
+
+// input image size
+#define INPUT_W 160
+#define INPUT_H 66
+
+#define DEBUG_TFLITE 0
+
+#if DEBUG_TFLITE==1
+#include "img.h"  // Use a static image for debugging
+#endif
+
+// prepare input image tensor
+#define USE_INT8 1
+
+#include "NeuralNetwork.h"
+extern NeuralNetwork *nn;
+
+// enable deeppicar dnn
+int g_use_dnn = 0; // set by web server
+
+uint32_t rgb565torgb888(uint16_t color)
+{
+    uint8_t hb, lb;
+    uint32_t r, g, b;
+
+    lb = (color >> 8) & 0xFF;
+    hb = color & 0xFF;
+
+    r = (lb & 0x1F) << 3;
+    g = ((hb & 0x07) << 5) | ((lb & 0xE0) >> 3);
+    b = (hb & 0xF8);
+    
+    return (r << 16) | (g << 8) | b;
+}
+
+int GetImage(camera_fb_t * fb, TfLiteTensor* input) 
+{
+    // MicroPrintf("fb: %dx%d-fmt:%d-len:%d INPUT: %dx%d", fb->width, fb->height, fb->format, fb->len, INPUT_W, INPUT_H);
+    assert(fb->format == PIXFORMAT_RGB565);
+
+    // Trimming Image
+    int post = 0;
+    int startx = (fb->width - INPUT_W) / 2;
+    int starty = (fb->height - INPUT_H);
+    
+    // printf("startx=%d starty=%d\n", startx, starty);
+
+    for (int y = 0; y < INPUT_H; y++) {
+        for (int x = 0; x < INPUT_W; x++) {
+            int getPos = (starty + y) * fb->width + startx + x;
+            // MicroPrintf("input[%d]: fb->buf[%d]=%d\n", post, getPos, fb->buf[getPos]);
+            uint16_t color = ((uint16_t *)fb->buf)[getPos];
+            uint32_t rgb = rgb565torgb888(color);
+            uint8_t r = (rgb >> 16) & 0xFF; // rgb_image_data[getPos*3];
+            uint8_t g = (rgb >>  8) & 0xFF; // rgb_image_data[getPos*3+1];
+            uint8_t b = (rgb >>  0) & 0xFF; // rgb_image_data[getPos*3+2];
+#if USE_INT8==1
+            int8_t *image_data = input->data.int8;
+            image_data[post * 3 + 0] = (int)r - 128;  // R
+            image_data[post * 3 + 1] = (int)g - 128;  // G
+            image_data[post * 3 + 2] = (int)b - 128;  // B
+            // if (post < 3) printf("input[%d]: %d %d %d\n", post, image_data[post * 3 + 0] + 128, image_data[post * 3 + 1] + 128, image_data[post * 3 + 2] + 128);
+#else
+            float *image_data = input->data.f;
+            image_data[post * 3 + 0] = (float) r / 255.0;
+            image_data[post * 3 + 1] = (float) g / 255.0;
+            image_data[post * 3 + 2] = (float) b / 255.0;
+#endif /* USE_INT8*/
+            post++;
+        }
+    }
+
+    return 0;
+}
+
+inline float rad2deg(float rad) 
+{
+  return 180.0*rad/3.14;
+}
+
+// steering
+#define CENTER 0
+#define RIGHT 1
+#define LEFT 2
+
+int GetAction(float rad)
+{
+    int deg = (int)rad2deg(rad);
+    if (deg < 10 and deg > -10)
+        return CENTER;
+    else if (deg >= 10)
+        return RIGHT;
+    else if (deg < -10)
+        return LEFT;
+    return -1;
+}
+
 void loop() {
-  // Do nothing. Everything is done in another task by the web server
-  delay(10000);
+
+  camera_fb_t *fb = NULL;
+  int64_t fr_pre, fr_dnn;
+  static int64_t last_frame = 0;
+
+  if (g_use_dnn == 0)
+  {
+      // Use pilotnet algorithm
+      return;
+  }
+
+  if (!last_frame)
+  {
+      last_frame = esp_timer_get_time();
+  }
+
+  fb = esp_camera_fb_get();
+
+  if (!fb) {
+    Serial.println("Camera capture failed");
+    return;
+  }
+
+#if DEBUG_TFLITE==0
+  GetImage(fb, g_nn->getInput());
+#else
+  // Use a static image for debugging
+  memcpy(g_nn->getInput()->data.int8, img_data, sizeof(img_data));
+  printf("input: %d %d %d...\n", 
+      g_nn->getInput()->data.int8[0], g_nn->getInput()->data.int8[1], g_nn->getInput()->data.int8[2]);
+#endif
+  fr_pre = esp_timer_get_time();
+
+  if (kTfLiteOk != g_nn->predict())
+  {
+      printf("Invoke failed.\n");
+  }
+#if USE_INT8==1
+  int q = g_nn->getOutput()->data.int8[0];
+  float scale = g_nn->getOutput()->params.scale;
+  int zero_point = g_nn->getOutput()->params.zero_point;
+  float angle = (q - zero_point) * scale;
+#else
+  float angle = g_nn->getOutput()->data.f[0];
+#endif
+  fr_dnn = esp_timer_get_time();
+
+  int deg = (int)rad2deg(angle);
+  
+  if (deg < 10 and deg > -10) 
+  {
+    center();
+    printf("center (%d) by CPU", deg);
+  } 
+  else if (deg >= 10) 
+  {
+    right();
+    printf("right (%d) by CPU", deg);
+  } 
+  else if (deg <= -10) 
+  {
+    left();
+    printf("left (%d) by CPU", deg);
+  }
+  printf(": angle=%.3f q=%d\n", angle, q);
+
+  if (fb)
+  {
+      esp_camera_fb_return(fb);
+      fb = NULL;
+  }
+  int64_t fr_end = esp_timer_get_time();
+  int64_t frame_time = (fr_end - last_frame)/1000;
+  if (g_use_dnn) printf("  %ums (%.1ffps): pre=%dms, dnn=%dms\n", 
+      (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time, 
+      (int)((fr_pre-last_frame)/1000), (int)((fr_dnn-fr_pre)/1000));
+  last_frame = fr_end;
 }

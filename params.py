@@ -5,8 +5,8 @@
 ##########################################################
 URL="http://192.168.4.1"
 
-# camera="camera-esp32web"
-camera="camera-null"
+camera="camera-esp32web"
+# camera="camera-null"
 
 ##########################################################
 # actuator selection

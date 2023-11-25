@@ -337,7 +337,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
     size_t _jpg_buf_len = 0;
     uint8_t *_jpg_buf = NULL;
     char *part_buf[128];
-
+        
     static int64_t last_frame = 0;
     if (!last_frame)
     {
@@ -352,7 +352,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
     }
 
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    httpd_resp_set_hdr(req, "X-Framerate", "60");
+    httpd_resp_set_hdr(req, "X-Framerate", "10");
 
 #if CONFIG_LED_ILLUMINATOR_ENABLED
     isStreaming = true;
@@ -361,6 +361,10 @@ static esp_err_t stream_handler(httpd_req_t *req)
 
     while (true)
     {
+        if (g_use_dnn) {
+            delay(1000);
+        }
+
         fb = esp_camera_fb_get();
         fr_cap = esp_timer_get_time();
 
@@ -427,14 +431,12 @@ static esp_err_t stream_handler(httpd_req_t *req)
         {
             res = httpd_resp_send_chunk(req, (const char *)_jpg_buf, _jpg_buf_len);
         }
-    out:
         if (fb)
         {
             esp_camera_fb_return(fb);
             fb = NULL;
-            _jpg_buf = NULL;
         }
-        else if (_jpg_buf)
+        if (_jpg_buf)
         {
             free(_jpg_buf);
             _jpg_buf = NULL;
@@ -446,41 +448,22 @@ static esp_err_t stream_handler(httpd_req_t *req)
         }
         int64_t fr_end = esp_timer_get_time();
 
-#if CONFIG_ESP_FACE_DETECT_ENABLED && ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_INFO
-        int64_t ready_time = (fr_ready - fr_start) / 1000;
-        int64_t face_time = (fr_face - fr_ready) / 1000;
-        int64_t recognize_time = (fr_recognize - fr_face) / 1000;
-        int64_t encode_time = (fr_encode - fr_recognize) / 1000;
-        int64_t process_time = (fr_encode - fr_start) / 1000;
-#endif
-
         int64_t frame_time = (fr_end - last_frame)/1000;
-        if (0 /* g_use_dnn */) printf("  %ums (%.1ffps)\n", 
-            (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time);
+        printf("Core%d:  %u ms (%.1ffps): enc: %d ms\n",
+            xPortGetCoreID(), (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time, (uint32_t)((fr_enc - fr_cap)/1000));
+
         last_frame = fr_end;
 
-#if ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_INFO
-        uint32_t avg_frame_time = ra_filter_run(&ra_filter, frame_time);
-#endif
         log_i("MJPG: %uB %ums (%.1ffps), AVG: %ums (%.1ffps)"
-#if CONFIG_ESP_FACE_DETECT_ENABLED
-                      ", %u+%u+%u+%u=%u %s%d"
-#endif
                  ,
                  (uint32_t)(_jpg_buf_len),
                  (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time,
                  avg_frame_time, 1000.0 / avg_frame_time
-#if CONFIG_ESP_FACE_DETECT_ENABLED
-                 ,
-                 (uint32_t)ready_time, (uint32_t)face_time, (uint32_t)recognize_time, (uint32_t)encode_time, (uint32_t)process_time,
-                 (detected) ? "DETECTED " : "", face_id
-#endif
-
         );
 
         // sleep 
         // xTaskDelayUntil(&xLastWakeTime, xFrequency);
-        delay(100);
+        // delay(100);
     }
 
 #if CONFIG_LED_ILLUMINATOR_ENABLED

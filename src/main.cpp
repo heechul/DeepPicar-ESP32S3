@@ -38,7 +38,7 @@ int pwmChannel = 0;
 void setup() {
 
   Serial.begin(115200);
-  while(!Serial); // When the serial monitor is turned on, the program starts to execute
+  // while(!Serial); // When the serial monitor is turned on, the program starts to execute
   Serial.setDebugOutput(false);
   Serial.println();
 
@@ -369,8 +369,8 @@ void loop() {
   }
   int64_t fr_end = esp_timer_get_time();
   int64_t frame_time = (fr_end - last_frame)/1000;
-  if (g_use_dnn) printf("  %ums (%.1ffps): pre=%dms, dnn=%dms\n", 
-      (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time, 
+  if (g_use_dnn) printf("Core%d:  %ums (%.1ffps): pre=%dms, dnn=%dms\n", 
+      xPortGetCoreID(), (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time,
       (int)((fr_pre-last_frame)/1000), (int)((fr_dnn-fr_pre)/1000));
   last_frame = fr_end;
 }

@@ -228,6 +228,12 @@ uint32_t rgb565torgb888(uint16_t color)
     return (r << 16) | (g << 8) | b;
 }
 
+#if USE_CROP==1
+#define GetImage GetImageCrop
+#else
+#define GetImage GetImageResize
+#endif
+
 int GetImageResize(camera_fb_t * fb, TfLiteTensor* input) 
 {
     // MicroPrintf("fb: %dx%d-fmt:%d-len:%d INPUT: %dx%d", fb->width, fb->height, fb->format, fb->len, INPUT_W, INPUT_H);
@@ -351,7 +357,7 @@ void loop() {
   fr_cap = esp_timer_get_time();
 
 #if DEBUG_TFLITE==0
-  GetImageResize(fb, g_nn->getInput());
+  GetImage(fb, g_nn->getInput());
 #else
   // Use a static image for debugging
   memcpy(g_nn->getInput()->data.int8, img_data, sizeof(img_data));

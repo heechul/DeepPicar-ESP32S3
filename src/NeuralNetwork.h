@@ -13,6 +13,7 @@
 #define INPUT_W 80
 #define INPUT_H 60
 #define INPUT_C 3
+#define USE_CROP 0
 
 namespace tflite
 {

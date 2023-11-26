@@ -38,7 +38,7 @@ int pwmChannel = 0;
 void setup() {
 
   Serial.begin(115200);
-  // while(!Serial); // When the serial monitor is turned on, the program starts to execute
+  while(!Serial); // When the serial monitor is turned on, the program starts to execute
   Serial.setDebugOutput(false);
   Serial.println();
 
@@ -198,11 +198,6 @@ void nomove() {
 }
 
 
-
-// input image size
-#define INPUT_W 160
-#define INPUT_H 66
-
 #define DEBUG_TFLITE 0
 
 #if DEBUG_TFLITE==1
@@ -233,16 +228,50 @@ uint32_t rgb565torgb888(uint16_t color)
     return (r << 16) | (g << 8) | b;
 }
 
-int GetImage(camera_fb_t * fb, TfLiteTensor* input) 
+int GetImageResize(camera_fb_t * fb, TfLiteTensor* input) 
+{
+    // MicroPrintf("fb: %dx%d-fmt:%d-len:%d INPUT: %dx%d", fb->width, fb->height, fb->format, fb->len, INPUT_W, INPUT_H);
+    assert(fb->format == PIXFORMAT_RGB565);
+
+    int x_scale = fb->width / INPUT_W;
+    int y_scale = fb->height / INPUT_H;
+    // MicroPrintf("x_scale=%d y_scale=%d\n", x_scale, y_scale);
+
+    int post = 0;
+    for (int y = 0; y < INPUT_H; y++) {
+        for (int x = 0; x < INPUT_W; x++) {
+            int getPos = y_scale * y * fb->width + x * x_scale;
+            uint16_t color = ((uint16_t *)fb->buf)[getPos];
+            uint32_t rgb = rgb565torgb888(color);
+            uint8_t r = (rgb >> 16) & 0xFF; // rgb_image_data[getPos*3];
+            uint8_t g = (rgb >>  8) & 0xFF; // rgb_image_data[getPos*3+1];
+            uint8_t b = (rgb >>  0) & 0xFF; // rgb_image_data[getPos*3+2];
+#if USE_INT8==1
+            int8_t *image_data = input->data.int8;
+            image_data[post * 3 + 0] = (int)r - 128;  // R
+            image_data[post * 3 + 1] = (int)g - 128;  // G
+            image_data[post * 3 + 2] = (int)b - 128;  // B
+            // if (post < 3) printf("input[%d]: %d %d %d\n", post, image_data[post * 3 + 0] + 128, image_data[post * 3 + 1] + 128, image_data[post * 3 + 2] + 128);
+#else
+            float *image_data = input->data.f;
+            image_data[post * 3 + 0] = (float) r / 255.0;
+            image_data[post * 3 + 1] = (float) g / 255.0;
+            image_data[post * 3 + 2] = (float) b / 255.0;
+#endif /* USE_INT8*/
+            post++;
+        }
+    }
+    return 0;
+}
+int GetImageCrop(camera_fb_t * fb, TfLiteTensor* input) 
 {
     // MicroPrintf("fb: %dx%d-fmt:%d-len:%d INPUT: %dx%d", fb->width, fb->height, fb->format, fb->len, INPUT_W, INPUT_H);
     assert(fb->format == PIXFORMAT_RGB565);
 
     // Trimming Image
     int post = 0;
-    int startx = (fb->width - INPUT_W) / 2;
-    int starty = (fb->height - INPUT_H);
-    
+    int startx = (fb->width - INPUT_W) * 0.50;
+    int starty = (fb->height - INPUT_H) * 0.75;
     // printf("startx=%d starty=%d\n", startx, starty);
 
     for (int y = 0; y < INPUT_H; y++) {
@@ -298,7 +327,7 @@ int GetAction(float rad)
 void loop() {
 
   camera_fb_t *fb = NULL;
-  int64_t fr_pre, fr_dnn;
+  int64_t fr_begin, fr_cap, fr_pre, fr_dnn;
   static int64_t last_frame = 0;
 
   if (g_use_dnn == 0)
@@ -307,10 +336,10 @@ void loop() {
       return;
   }
 
+  fr_begin = esp_timer_get_time();
+
   if (!last_frame)
-  {
-      last_frame = esp_timer_get_time();
-  }
+    last_frame = fr_begin;
 
   fb = esp_camera_fb_get();
 
@@ -319,8 +348,10 @@ void loop() {
     return;
   }
 
+  fr_cap = esp_timer_get_time();
+
 #if DEBUG_TFLITE==0
-  GetImage(fb, g_nn->getInput());
+  GetImageResize(fb, g_nn->getInput());
 #else
   // Use a static image for debugging
   memcpy(g_nn->getInput()->data.int8, img_data, sizeof(img_data));
@@ -369,8 +400,8 @@ void loop() {
   }
   int64_t fr_end = esp_timer_get_time();
   int64_t frame_time = (fr_end - last_frame)/1000;
-  if (g_use_dnn) printf("Core%d:  %ums (%.1ffps): pre=%dms, dnn=%dms\n", 
+  if (g_use_dnn) printf("Core%d:  %ums (%.1ffps): cap=%dms, pre=%dms, dnn=%dms\n", 
       xPortGetCoreID(), (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time,
-      (int)((fr_pre-last_frame)/1000), (int)((fr_dnn-fr_pre)/1000));
+      (int)((fr_cap-fr_begin)/1000), (int)((fr_pre-fr_cap)/1000), (int)((fr_dnn-fr_pre)/1000));
   last_frame = fr_end;
 }

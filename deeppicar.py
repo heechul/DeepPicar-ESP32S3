@@ -66,7 +66,7 @@ def get_image(img):
     scaled_img = cv2.resize(img, (scaled_w, scaled_h))
     # print(scaled_img.shape)
     # crop bottom center pixels of the model input size
-    startx = int((scaled_w - params.img_width) * 0.5);
+    startx = int((scaled_w - params.img_width) * 0.75);
     starty = int((scaled_h - params.img_height) * 1.0);
     # print("startx, starty: ", startx, starty)
     return scaled_img[starty:starty+params.img_height, startx:startx+params.img_width,:]

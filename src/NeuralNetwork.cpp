@@ -8,12 +8,13 @@
 #endif
 
 #include "NeuralNetwork.h"
-#include "opt-160x66x3.cc"
 
 #include <esp_attr.h>
 #include <Arduino.h>
 
 int kTensorArenaSize = 128 * 1024;
+
+#include "model.h"
 
 NeuralNetwork::NeuralNetwork()
 {
@@ -24,7 +25,7 @@ NeuralNetwork::NeuralNetwork()
     printf("largest size (internal): %d\n", heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
 
     // get model (.tflite) from flash
-    model = tflite::GetModel(models_opt_160x66x3_tflite);
+    model = tflite::GetModel(gmodel);
     if (model->version() != TFLITE_SCHEMA_VERSION)
     {
         MicroPrintf("Model provided is schema version %d not equal to supported "

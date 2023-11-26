@@ -9,6 +9,11 @@
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/schema/schema_generated.h"
 
+// input image size
+#define INPUT_W 80
+#define INPUT_H 60
+#define INPUT_C 3
+
 namespace tflite
 {
     template <unsigned int tOpCount>

@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 #include "esp_http_server.h"
 #include "esp_timer.h"
 #include "esp_camera.h"
@@ -451,7 +452,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
         int64_t frame_time = (fr_end - last_frame)/1000;
         printf("Core%d:  %u ms (%.1ffps): enc: %d ms\n",
             xPortGetCoreID(), (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time, (uint32_t)((fr_enc - fr_cap)/1000));
-
+    
         last_frame = fr_end;
 
         log_i("MJPG: %uB %ums (%.1ffps), AVG: %ums (%.1ffps)"

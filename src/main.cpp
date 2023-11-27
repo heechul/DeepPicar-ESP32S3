@@ -86,7 +86,7 @@ void setup() {
     // Best option for face detection/recognition
     config.frame_size = FRAMESIZE_QQVGA;
 #if CONFIG_IDF_TARGET_ESP32S3
-    config.fb_count = 2;
+    config.fb_count = 3;
 #endif
   }
 

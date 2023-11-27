@@ -57,22 +57,24 @@ def turn_off():
         keyfile.close()
         vidfile.release()
 
-# scaled crop. return img_height x img_width image
-def get_image(img):
+# Scale the image to the model input size
+def get_image_resize(img):
     orig_h, orig_w, _ = img.shape
-    # print("orig img info: ", img.shape, img.dtype, img.min(), img.max(), img[0][0], img[0][1], img[0][2])
-    scaled_h = int(params.img_width * orig_h / orig_w)
-    scaled_w = params.img_width
-    scaled_img = cv2.resize(img, (scaled_w, scaled_h))
-    # print(scaled_img.shape)
-    # crop bottom center pixels of the model input size
-    startx = int((scaled_w - params.img_width) * 0.75);
-    starty = int((scaled_h - params.img_height) * 1.0);
-    # print("startx, starty: ", startx, starty)
-    return scaled_img[starty:starty+params.img_height, startx:startx+params.img_width,:]
+    scaled_img = cv2.resize(img, (params.img_width, params.img_height))
+    return scaled_img
+
+# Crop the image to the model input size
+def get_image_crop(img):
+    orig_h, orig_w, _ = img.shape
+    startx = int((orig_w - params.img_width) * 0.5); # crop from both sides
+    starty = int((orig_h - params.img_height) * 0.75); # crop from bottom
+    return img[starty:starty+params.img_height, startx:startx+params.img_width,:]
  
 def preprocess(img):
-    img = get_image(img)
+    if args.pre == "resize":
+        img = get_image_resize(img)
+    elif args.pre == "crop":
+        img = get_image_crop(img)
     # print("cropped img info: ", img.shape, img.dtype, img.min(), img.max(), img[0][0], img[0][1], img[0][2])
 
     # Convert to grayscale and read channel dimension
@@ -140,7 +142,7 @@ parser.add_argument("-n", "--ncpu", help="number of cores to use.", type=int, de
 parser.add_argument("-f", "--hz", help="control frequnecy", type=int)
 parser.add_argument("--fpvvideo", help="Take FPV video of DNN driving", action="store_true")
 parser.add_argument("--use_tensorflow", help="use the full tensorflow instead of tflite", action="store_true")
-parser.add_argument("--pre", help="preprocessing [resize|crop]", type=str, default="crop")
+parser.add_argument("--pre", help="preprocessing [resize|crop]", type=str, default="resize")
 parser.add_argument("--int8", help="use int8 quantized model", action="store_true")
 
 args = parser.parse_args()
@@ -348,8 +350,8 @@ while True:
         if frame_id >= 1000:
             print ("recorded 1000 frames")
             break
-        print ("%.3f %d %.3f %d(ms)" %
-           (ts, frame_id, angle, int((time.time() - ts)*1000)))
+        if frame_id % 10 == 0: 
+            print ("%.3f %d %.3f %d(ms)" %(ts, frame_id, angle, int((time.time() - ts)*1000)))
     
     if view_video == True:
         if use_dnn == True:

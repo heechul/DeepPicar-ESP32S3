@@ -38,7 +38,7 @@ int pwmChannel = 0;
 void setup() {
 
   Serial.begin(115200);
-  while(!Serial); // When the serial monitor is turned on, the program starts to execute
+  // while(!Serial); // When the serial monitor is turned on, the program starts to execute
   Serial.setDebugOutput(false);
   Serial.println();
 
@@ -211,7 +211,7 @@ void nomove() {
 extern NeuralNetwork *nn;
 
 // enable deeppicar dnn
-int g_use_dnn = 1; // set by web server
+int g_use_dnn = 0; // set by web server
 
 uint32_t rgb565torgb888(uint16_t color)
 {

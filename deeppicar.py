@@ -99,13 +99,6 @@ def overlay_image(l_img, s_img, x_offset, y_offset):
                   (1.0 - s_img[:,:,3]/255.0))
     return l_img
 
-def is_valid_steering(angle):
-    degree = rad2deg(angle)
-    if degree >= -30 and degree <= 30:
-        return True
-    else:
-        return False
-
 def get_action(angle):
     degree = rad2deg(angle)
     if degree <= -args.turnthresh:
@@ -116,6 +109,17 @@ def get_action(angle):
         return "right"
     else:
         return "unknown"
+
+def put_action(angle):
+    degree = rad2deg(angle)
+    if degree <= -args.turnthresh:
+        actuator.left()
+    elif degree < args.turnthresh and degree > -args.turnthresh:
+        actuator.center()
+    elif degree >= args.turnthresh:
+        actuator.right()
+    else:
+        actuator.stop()
 
 def print_stats(execution_times):
     # Calculate statistics
@@ -158,7 +162,6 @@ parser.add_argument("--fpvvideo", help="Take FPV video of DNN driving", action="
 parser.add_argument("--use_tensorflow", help="use the full tensorflow instead of tflite", action="store_true")
 parser.add_argument("--pre", help="preprocessing [resize|crop]", type=str, default="resize")
 parser.add_argument("--int8", help="use int8 quantized model", action="store_true", default=True)
-parser.add_argument("--dagger", help="use dagger mode", action="store_true", default=False)
 args = parser.parse_args()
 
 if args.dnn:
@@ -174,8 +177,7 @@ if args.hz:
     print("new period: ", period)
 if args.fpvvideo:
     print("FPV video of DNN driving is on")
-if args.dagger:
-    print("Dagger mode is on")
+
 
 print("period (sec):", period)
 print("preprocessing:", args.pre)
@@ -228,13 +230,12 @@ start_ts = time.time()
 frame_arr = []
 angle_arr = []
 actuator_times = []
-prev_steering_angle = 0
+angle = dnn_angle = 0.0
+prev_steering_angle = -1
 stext = ""
 
 # enter main loop
 while True:
-    angle = math.pi # invalid angle (180 degree) 
-
     if use_thread:
         time.sleep(next(g))
     frame = camera.read_frame()
@@ -249,15 +250,12 @@ while True:
     # process input
     if ch == ord('j'): # left 
         angle = deg2rad(-30)
-        actuator.left()
         print ("left")
     elif ch == ord('k'): # center 
         angle = deg2rad(0)
-        actuator.center()
         print ("center")
     elif ch == ord('l'): # right
         angle = deg2rad(30)
-        actuator.right()
         print ("right")
     elif ch == ord('a'):
         actuator.ffw()
@@ -265,6 +263,7 @@ while True:
     elif ch == ord('s'):
         actuator.stop()
         print ("stop")
+        enable_record = False # stop recording as well 
     elif ch == ord('z'):
         actuator.rew()
         print ("reverse")
@@ -307,32 +306,14 @@ while True:
                 q = interpreter.get_tensor(output_index)[0][0]
                 dnn_angle = scale * (q - zerop)
                 # print('dequantized output:', q, angle, rad2deg(angle))
-
-        if not is_valid_steering(angle):
-            # if no valid expert input. apply dnn 
-            degree = rad2deg(dnn_angle)
-            if degree <= -args.turnthresh:
-                actuator.left()
-                stext = "DNN:{:3d} {}".format(degree, "left")
-            elif degree < args.turnthresh and degree > -args.turnthresh:
-                actuator.center()
-                stext = "DNN:{:3d} {}".format(degree, "center")
-            elif degree >= args.turnthresh:
-                actuator.right()
-                stext = "DNN:{:3d} {}".format(degree, "right")
-            print (stext)
-            angle = dnn_angle
-        else:
-            # if valid expert input is detected. ignore dnn output
-            if get_action(angle) != get_action(dnn_angle):
-                # expert and AI disagree. we should record this. 
-                print ("expert and AI disagree")
-                print ("expert: ", get_action(angle))
-                print ("AI    : ", get_action(dnn_angle))
+            else:
+                print("unknown output type")
+                exit(1)
+        # print('dnn_angle:', dnn_angle, rad2deg(dnn_angle))
+        # 3. actuator output
+        put_action(dnn_angle)
     else:
-        # non-AI mode. keep the previous steering angle. 
-        if not is_valid_steering(angle):
-            angle = prev_steering_angle
+        put_action(angle)
 
     dur = time.time() - ts
     if dur > period:
@@ -358,36 +339,36 @@ while True:
         if frame_id == 0:
             # create files for data recording
             keyfile = open(params.rec_csv_file, 'w+')
-            keyfile.write("ts,frame,wheel\n") # ts (ms)
+            keyfile.write("ts,frame,wheel,ai\n") # ts (ms)
             try:
                 fourcc = cv2.cv.CV_FOURCC(*'XVID')
             except AttributeError as e:
                 fourcc = cv2.VideoWriter_fourcc(*'XVID')
             vidfile = cv2.VideoWriter(params.rec_vid_file, fourcc,
                                     cfg_cam_fps, cfg_cam_res)
-        if args.dagger == False or (args.dnn == True and (get_action(angle) != get_action(dnn_angle))):
-            # In dagger mode; record expert input when DNN and expert disagree
 
-            # increase frame_id
-            frame_id += 1
+        # increase frame_id
+        frame_id += 1
 
-            # write input (angle)
-            str = "{},{},{}\n".format(int(ts*1000), frame_id, angle)
-            keyfile.write(str)
+        # write input (angle)
+        str = "{},{},{},{}\n".format(int(ts*1000), frame_id, angle, dnn_angle)
+        keyfile.write(str)
 
-            # write video stream
-            vidfile.write(frame)
-            #img_name = "cal_images/opencv_frame_{}.png".format(frame_id)
-            #cv2.imwrite(img_name, frame)
-            if frame_id >= 1000:
-                print ("recorded 1000 frames")
-                break
-            if frame_id % 10 == 0: 
-                print ("%.3f %d %.3f %d(ms)" %(ts, frame_id, angle, int((time.time() - ts)*1000)))
+        # write video stream
+        vidfile.write(frame)
+        #img_name = "cal_images/opencv_frame_{}.png".format(frame_id)
+        #cv2.imwrite(img_name, frame)
+        if frame_id >= 1000:
+            print ("recorded 1000 frames")
+            break
+        if frame_id % 10 == 0: 
+            print ("%.3f %d %.3f %d(ms)" %(ts, frame_id, angle, int((time.time() - ts)*1000)))
     
     # update previous steering angle
-    assert(is_valid_steering(angle))
-    prev_steering_angle = angle
+    if prev_steering_angle != angle:
+        stext = "steering: %d" % (rad2deg(angle))
+        print(stext)
+        prev_steering_angle = angle
 
 print ("Finish..")
 print ("Actuator latency measurements: {} trials".format(len(actuator_times)))

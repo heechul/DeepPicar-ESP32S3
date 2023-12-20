@@ -264,6 +264,7 @@ while True:
         actuator.stop()
         print ("stop")
         enable_record = False # stop recording as well 
+        args.dnn = False # manual mode
     elif ch == ord('z'):
         actuator.rew()
         print ("reverse")
@@ -278,14 +279,14 @@ while True:
         print("actuator latency measumenets: {} trials".format(n_trials))
         measure_execution_time(actuator.left, n_trials)
     elif ch == ord('r'):
-        print ("toggle record mode")
         enable_record = not enable_record
+        print ("record mode: ", enable_record)
     elif ch == ord('t'):
         print ("toggle video mode")
         view_video = not view_video
     elif ch == ord('d'):
-        print ("toggle DNN mode")
         args.dnn = not args.dnn
+        print ("dnn mode:", args.dnn)
     elif ch == ord('q'):
         break
 
@@ -309,10 +310,15 @@ while True:
             else:
                 print("unknown output type")
                 exit(1)
-        # print('dnn_angle:', dnn_angle, rad2deg(dnn_angle))
-        # 3. actuator output
-        put_action(dnn_angle)
+        # print('dnn_angle:', dnn_angle, rad2deg(dnn_angle))        
+        # 3. actuator output. 
+        #    50% of time choose dnn_angle, while chooing angle for the rest 
+        if np.random.rand() < 0.3:
+            put_action(dnn_angle)
+        else:
+            put_action(angle)
     else:
+        # manual mode
         put_action(angle)
 
     dur = time.time() - ts
@@ -324,9 +330,12 @@ while True:
     
     if view_video == True:
         if args.dnn == True:
-            textColor = (255,0,0)
+            if get_action(angle) == get_action(dnn_angle):
+                textColor = (0, 255, 0)
+            else:
+                textColor = (255,0,0)
             bgColor = (0,0,0)
-            newImage = Image.new('RGBA', (100, 20), bgColor)
+            newImage = Image.new('RGBA', (140, 20), bgColor)
             drawer = ImageDraw.Draw(newImage)
             drawer.text((0, 0), stext, fill=textColor)
             newImage = cv2.cvtColor(np.array(newImage), cv2.COLOR_BGR2RGBA)
@@ -365,8 +374,9 @@ while True:
             print ("%.3f %d %.3f %d(ms)" %(ts, frame_id, angle, int((time.time() - ts)*1000)))
     
     # update previous steering angle
+    stext = "EXP: %s, AI: %s" % (get_action(angle), get_action(dnn_angle))
+
     if prev_steering_angle != angle:
-        stext = "steering: %d" % (rad2deg(angle))
         print(stext)
         prev_steering_angle = angle
 

@@ -22,7 +22,7 @@ NeuralNetwork::NeuralNetwork()
     printf("largest size (8bit): %d\n", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
     printf("largest size (default): %d\n", heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
     printf("largest size (spiram): %d\n", heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
-    printf("largest size (internal): %d\n", heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+    printf("largest size (internal SRAM): %d\n", heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
 
     // get model (.tflite) from flash
     model = tflite::GetModel(gmodel);

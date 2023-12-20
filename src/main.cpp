@@ -11,10 +11,11 @@ NeuralNetwork *g_nn;
 // ===========================
 // Enter your WiFi credentials
 // ===========================
-#define SETUP_AP 1
+#define SETUP_AP 1 // 1: setup AP mode, 0: setup Station mode
+#define WAIT_SERIAL 1 // 1: wait for serial monitor, 0: don't wait
 
 #if SETUP_AP==1
-const char* ssid = "ESP32";
+const char* ssid = "ESP32S3";
 const char* password = "123456789"; 
 #else
 const char* ssid = "";
@@ -38,7 +39,15 @@ int pwmChannel = 0;
 void setup() {
 
   Serial.begin(115200);
-  // while(!Serial); // When the serial monitor is turned on, the program starts to execute
+#if WAIT_SERIAL==1
+  while(!Serial) {
+    static int retries = 0;
+    delay(1000); // Wait for serial monitor to open
+    if (retries++ > 5) {
+      break;
+    }
+  } // When the serial monitor is turned on, the program starts to execute
+#endif
   Serial.setDebugOutput(false);
   Serial.println();
 
@@ -117,7 +126,7 @@ void setup() {
 #if SETUP_AP==1
   Serial.print("Setting AP (Access Point)…");
   WiFi.softAP(ssid, password);
-  Serial.print("Camera Ready! Use 'http://");
+  Serial.print("Use 'http://");
   Serial.print(WiFi.softAPIP());
   Serial.println("' to connect");
 #else
@@ -130,7 +139,7 @@ void setup() {
   }
   Serial.println("");
   Serial.println("WiFi connected");
-  Serial.print("Camera Ready! Use 'http://");
+  Serial.print("Use 'http://");
   Serial.print(WiFi.localIP());
   Serial.println("' to connect");
 #endif
@@ -211,7 +220,7 @@ void nomove() {
 extern NeuralNetwork *nn;
 
 // enable deeppicar dnn
-int g_use_dnn = 0; // set by web server
+int g_use_dnn = 1; // set by web server
 
 uint32_t rgb565torgb888(uint16_t color)
 {

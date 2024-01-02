@@ -59,10 +59,16 @@ void set_throttle(int throttle_pct)
   if (tmp < 256 && tmp >= 0) dutyCycle = tmp;
 }
 void throttleup() {
-  if (dutyCycle < 255) dutyCycle += 5;
+  if (dutyCycle < 255) {
+    dutyCycle += 5;
+    run();
+  }
 }
 void throttledown() {
-  if (dutyCycle > 200) dutyCycle -= 5;
+  if (dutyCycle > 200) {
+    dutyCycle -= 5;
+    run();
+  }
 }
 void nomove() {
   ledcWrite(pwmChannel, 0);  

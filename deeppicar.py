@@ -154,6 +154,7 @@ def measure_execution_time(func, num_trials):
 
 parser = argparse.ArgumentParser(description='DeepPicar main')
 parser.add_argument("-d", "--dnn", help="Enable DNN", action="store_true", default=False)
+parser.add_argument("-p", "--prob_dnn", help="probability of using DNN", type=float, default=1.0)
 parser.add_argument("-t", "--throttle", help="throttle percent. [0-100]%", type=int, default=100)
 parser.add_argument("--turnthresh", help="throttle percent. [0-30]degree", type=int, default=10)
 parser.add_argument("-n", "--ncpu", help="number of cores to use.", type=int, default=2)
@@ -182,6 +183,7 @@ if args.fpvvideo:
 print("period (sec):", period)
 print("preprocessing:", args.pre)
 print("use_int8:", args.int8)
+print("prob_dnn:", args.prob_dnn)
 
 ##########################################################
 # import deeppicar's DNN model
@@ -257,17 +259,25 @@ while True:
     elif ch == ord('l'): # right
         angle = deg2rad(30)
         print ("right")
-    elif ch == ord('a'):
+    elif ch == ord('a'): # accel
         actuator.ffw()
         print ("accel")
-    elif ch == ord('s'):
+        start_ts = ts
+    elif ch == ord('s'): # stop
         actuator.stop()
         print ("stop")
+        print ("duration: ", (ts - start_ts))
         enable_record = False # stop recording as well 
         args.dnn = False # manual mode
-    elif ch == ord('z'):
+    elif ch == ord('z'): # reverse
         actuator.rew()
         print ("reverse")
+    elif ch == ord('i'):
+        actuator.throttleup()
+        print ("throttle up")
+    elif ch == ord('m'):
+        actuator.throttledown()
+        print ("thtotle down")
     elif ch == ord('n'):
         actuator.auto()
         print ("auto")
@@ -313,7 +323,7 @@ while True:
         # print('dnn_angle:', dnn_angle, rad2deg(dnn_angle))        
         # 3. actuator output. 
         #    50% of time choose dnn_angle, while chooing angle for the rest 
-        if np.random.rand() < 0.3:
+        if np.random.rand() < args.prob_dnn:
             put_action(dnn_angle)
         else:
             put_action(angle)

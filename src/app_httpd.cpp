@@ -450,8 +450,8 @@ static esp_err_t stream_handler(httpd_req_t *req)
         int64_t fr_end = esp_timer_get_time();
 
         int64_t frame_time = (fr_end - last_frame)/1000;
-        printf("Core%d:  %u ms (%.1ffps): enc: %d ms\n",
-            xPortGetCoreID(), (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time, (uint32_t)((fr_enc - fr_cap)/1000));
+        // printf("Core%d:  %u ms (%.1ffps): enc: %d ms\n",
+        //     xPortGetCoreID(), (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time, (uint32_t)((fr_enc - fr_cap)/1000));
     
         last_frame = fr_end;
 

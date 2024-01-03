@@ -27,6 +27,12 @@ def ffw():
 def rew():
     requests.get(URL + "/control?var=backward&val={}".format(0))
 
+def throttleup():
+    requests.get(URL + "/control?var=throttleup&val={}".format(0))
+
+def throttledown():
+    requests.get(URL + "/control?var=throttledown&val={}".format(0))
+
 # steering
 def center():
     requests.get(URL + "/control?var=center&val={}".format(0))

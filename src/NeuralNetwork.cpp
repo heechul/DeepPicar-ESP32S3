@@ -12,7 +12,7 @@
 #include <esp_attr.h>
 #include <Arduino.h>
 
-int kTensorArenaSize = 128 * 1024;
+int kTensorArenaSize = 178 * 1024;
 
 #include "model.h"
 

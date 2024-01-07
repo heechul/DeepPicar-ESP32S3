@@ -231,11 +231,12 @@ start_ts = time.time()
 
 frame_arr = []
 angle_arr = []
-actuator_times = []
+dnn_times = []
 angle = dnn_angle = 0.0
 prev_steering_angle = -1
 stext = ""
 
+temporal_context_buffer = []
 # enter main loop
 while True:
     if use_thread:
@@ -275,7 +276,7 @@ while True:
     elif ch == ord('i'):
         actuator.throttleup()
         print ("throttle up")
-    elif ch == ord('m'):
+    elif ch == ord(','):
         actuator.throttledown()
         print ("thtotle down")
     elif ch == ord('n'):
@@ -305,6 +306,16 @@ while True:
         # 1. machine input
         img = preprocess(frame)
         
+        # add temporal context to the input image
+        temporal_context_buffer.append(img)
+        if len(temporal_context_buffer) < params.temporal_context:
+            for i in range(params.temporal_context - len(temporal_context_buffer)):
+                temporal_context_buffer.append(img)
+        elif len(temporal_context_buffer) > params.temporal_context:
+            temporal_context_buffer.pop(0)   
+
+        img = np.concatenate(temporal_context_buffer, axis=3) # (batch, height, weight, channel). 
+        # print (img.shape)
         # 2. machine output
         if args.use_tensorflow:
             dnn_angle = model.predict(img)[0]
@@ -327,6 +338,8 @@ while True:
             put_action(dnn_angle)
         else:
             put_action(angle)
+        # 4. latency measurement
+        dnn_times.append(time.time() - ts)
     else:
         # manual mode
         put_action(angle)
@@ -391,7 +404,7 @@ while True:
         prev_steering_angle = angle
 
 print ("Finish..")
-print ("Actuator latency measurements: {} trials".format(len(actuator_times)))
-if len(actuator_times) > 0:
-    print_stats(actuator_times)
+print ("DNN latency measurements: {} trials".format(len(dnn_times)))
+if len(dnn_times) > 0:
+    print_stats(dnn_times)
 turn_off()

@@ -26,7 +26,7 @@ view_video = False
 enable_record = False
 cfg_cam_res = (160, 120)
 cfg_cam_fps = 30
-
+enable_ondevice_dnn = False
 frame_id = 0
 angle = 0.0
 period = 0.05 # sec (=50ms)
@@ -232,6 +232,7 @@ start_ts = time.time()
 frame_arr = []
 angle_arr = []
 dnn_times = []
+action_times = []
 angle = dnn_angle = 0.0
 prev_steering_angle = -1
 stext = ""
@@ -266,10 +267,12 @@ while True:
         start_ts = ts
     elif ch == ord('s'): # stop
         actuator.stop()
+        actuator.manual()
         print ("stop")
-        print ("duration: ", (ts - start_ts))
+        print ("duration: %.2f" % (ts - start_ts))
         enable_record = False # stop recording as well 
         args.dnn = False # manual mode
+        enable_ondevice_dnn = False
     elif ch == ord('z'): # reverse
         actuator.rew()
         print ("reverse")
@@ -281,9 +284,11 @@ while True:
         print ("thtotle down")
     elif ch == ord('n'):
         actuator.auto()
-        print ("auto")
+        enable_ondevice_dnn = True
+        print ("auto: Ondevice DNN enabled")
     elif ch == ord('b'):
         actuator.manual()
+        enable_ondevice_dnn = False
         print ("manual")
     elif ch == ord('m'):
         n_trials=1000
@@ -331,6 +336,9 @@ while True:
             else:
                 print("unknown output type")
                 exit(1)
+        # dnn latency measurement
+        dnn_times.append(time.time() - ts)
+
         # print('dnn_angle:', dnn_angle, rad2deg(dnn_angle))        
         # 3. actuator output. 
         #    50% of time choose dnn_angle, while chooing angle for the rest 
@@ -338,8 +346,11 @@ while True:
             put_action(dnn_angle)
         else:
             put_action(angle)
-        # 4. latency measurement
-        dnn_times.append(time.time() - ts)
+        # latency measurement
+        action_times.append(time.time() - ts)
+    elif enable_ondevice_dnn == True:
+        # AI enabled mode
+        pass    # do nothing. 
     else:
         # manual mode
         put_action(angle)
@@ -373,9 +384,11 @@ while True:
             keyfile = open(params.rec_csv_file, 'w+')
             keyfile.write("ts,frame,wheel,ai\n") # ts (ms)
             try:
-                fourcc = cv2.cv.CV_FOURCC(*'XVID')
+                fourcc = cv2.cv.CV_FOURCC(*'h264')
             except AttributeError as e:
+                print ("fourcc = cv2.cv.CV_FOURCC(*'h264') failed")
                 fourcc = cv2.VideoWriter_fourcc(*'XVID')
+                print ("fourcc = cv2.VideoWriter_fourcc(*'XVID')")
             vidfile = cv2.VideoWriter(params.rec_vid_file, fourcc,
                                     cfg_cam_fps, cfg_cam_res)
 
@@ -404,7 +417,10 @@ while True:
         prev_steering_angle = angle
 
 print ("Finish..")
-print ("DNN latency measurements: {} trials".format(len(dnn_times)))
 if len(dnn_times) > 0:
+    print ("DNN latency measurements: {} trials".format(len(dnn_times)))
     print_stats(dnn_times)
+if len(action_times) > 0:
+    print ("Actuator latency measurements: {} trials".format(len(action_times)))
+    print_stats(action_times)
 turn_off()

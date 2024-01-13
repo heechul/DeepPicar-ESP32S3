@@ -1,0 +1,10 @@
+opencv-python
+matplotlib 
+matplotlib 
+tqdm 
+pandas 
+scikit-image 
+scikit-learn
+tensorflow_hub
+tensorflow_datasets
+tensorflow_model_optimization

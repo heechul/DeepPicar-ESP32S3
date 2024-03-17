@@ -138,6 +138,16 @@ def print_stats(execution_times):
     print(f"50th Percentile Execution Time: {p50:.6f} seconds")
 
 def measure_execution_time(func, num_trials):
+    """
+    Measure the execution time of a function.
+
+    Args:
+        func (function): Function to measure.
+        num_trials (int): Number of trials.
+
+    Returns:
+        list: List of execution times.
+    """
     execution_times = []
     for _ in range(num_trials):
         start_time = time.time()
@@ -384,9 +394,9 @@ while True:
             keyfile = open(params.rec_csv_file, 'w+')
             keyfile.write("ts,frame,wheel,ai\n") # ts (ms)
             try:
-                fourcc = cv2.cv.CV_FOURCC(*'h264')
+                fourcc = cv2.cv.CV_FOURCC(*'XVID')
             except AttributeError as e:
-                print ("fourcc = cv2.cv.CV_FOURCC(*'h264') failed")
+                print ("fourcc = cv2.cv.CV_FOURCC(*'XVID') failed")
                 fourcc = cv2.VideoWriter_fourcc(*'XVID')
                 print ("fourcc = cv2.VideoWriter_fourcc(*'XVID')")
             vidfile = cv2.VideoWriter(params.rec_vid_file, fourcc,

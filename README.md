@@ -1,38 +1,55 @@
 # DeepPicar-ESP32S3
 
-TFLite model viewer
-https://netron.app
+## Driving
+Launch 'deeppicar.py' to control DeepPicar. 
+
+For throttle control, use '-t' option. 
+For frequnecy control, use '-f' option. 
+
+For example, the following will set the throttle at 50% and the control frequency at 40Hz
+
+    $ python deeppicar.py -t 50 -f 40
+
+At runtime, you can give a command to the car by pressing a key. The supported commands are as follows. 
+
+    'j' - left turn
+    'l' - right turn 
+    'k' - center
+    'a' - acceleration 
+    'z' - reverse
+    's' - stop 
+    'd' - enable/disable DNN
+    'r' - enable/disable data recording
+    'q' - quit
+
+To collecta data, press 'r' and then drive the car for a while. after recording 1000 frames, the recording session will automatically stop. The video and key input data are stored in out-video.avi and out-key.csv files, respectively. 
+
+## Training
+
+Use RunAll-v2.ipynb to train a model. For example, change the folowing three variables to change 
+the model size. 
+
+img_width = 80
+img_height = 60
+img_channels = 3
 
 ## Models
 
+| Model	  |  input res.   | #params      |  flops       |  accuracy  |
+|---------|---------------|--------------|--------------|------------|
+|Opt-K2(L)|	              |              |              |            |
+|Opt-K2(M)|               |              |              |            |
+|Opt-K2(S)|               |              |              |            |
 
-| Model	         |  #params      |  flops       |  accuracy  |
-|----------------|---------------|--------------|-------------
-| 160x66x3(full) |	220219	     |              |  82%       |
-| 160x66x3(depth)|  102641       |              |  7X%      |
+## Misc
+TFLite model viewer
+https://netron.app
 
 ## Performance Analysis
-
-| Model	         |  idf | pio(unopt) | pio(opt) |
-|----------------|---------------|--------------|-------------|
-| 160x66x3(full) |	115	         |   1793       | 205       |
-
-(*) all numbers are in *ms* units.
+TBD
 
 ## Design considerations
-
-### full vs. depthwise
-full is much better than depthwise in terms of accuracy. also, it's faster to train. 
+TBD
 
 ### int8 vs. float input image format
-
-int8 and float achieve similar accuracy (float is slightly better)
-
-float execution time profile:  
-311ms (3.2fps): cap=0ms, pre=86ms, dnn=201ms, enc=19ms
-
-int8  execution time profile: 
-223ms (4.5fps): cap=0ms, pre=3ms, dnn=198ms, enc=19ms
-
-int8 & internal SRAM buffer execution time profile:
-123ms (8.1fps): cap=0ms, pre=2ms, dnn=98ms, enc=20ms
+TBD

@@ -2,6 +2,10 @@
 #include <WiFi.h>
 #include "NeuralNetwork.h"
 
+// enable deeppicar dnn by default
+int g_use_dnn = 0; // set by web server
+
+// DNN model pointer
 NeuralNetwork *g_nn;
 
 #define CAMERA_MODEL_XIAO_ESP32S3 // Has PSRAM
@@ -158,8 +162,6 @@ void setup() {
 #include "NeuralNetwork.h"
 extern NeuralNetwork *nn;
 
-// enable deeppicar dnn
-int g_use_dnn = 0; // set by web server
 
 uint32_t rgb565torgb888(uint16_t color)
 {

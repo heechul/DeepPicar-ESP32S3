@@ -4,7 +4,6 @@
 #   "camera-esp32web" "camera-null"
 ##########################################################
 URL="http://192.168.4.1"
-
 camera="camera-esp32web"
 # camera="camera-null"
 
@@ -22,17 +21,18 @@ inputdev="input-kbd"
 
 ##########################################################
 # model input config 
+#   160x120x3 or 80x60x3 or 40x30x3
 ##########################################################
-img_width = 80
-img_height = 60
+img_width = 160
+img_height = 120
 img_channels = 3
-
+temporal_context = 1
 ##########################################################
 # model selection
 #   "model_large"   <-- nvidia dave-2 model
 ##########################################################
-model_name = "model_opt"
-model_file = "models/{}-{}x{}x{}".format(model_name[6:], img_width, img_height, img_channels)
+model_name = "opt-k2"
+model_file = "models/{}-{}x{}x{}-T{}".format(model_name, img_width, img_height, img_channels, temporal_context)
 
 ##########################################################
 # recording config 

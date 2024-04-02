@@ -25,53 +25,12 @@
 #include "esp32-hal-log.h"
 #endif
 
-// Face Detection will not work on boards without (or with disabled) PSRAM
-#ifdef BOARD_HAS_PSRAM
-#define CONFIG_ESP_FACE_DETECT_ENABLED 0
-// Face Recognition takes upward from 15 seconds per frame on chips other than ESP32S3
-// Makes no sense to have it enabled for them
-#if CONFIG_IDF_TARGET_ESP32S3
-#define CONFIG_ESP_FACE_RECOGNITION_ENABLED 0
-#else
-#define CONFIG_ESP_FACE_RECOGNITION_ENABLED 0
-#endif
-#else
 #define CONFIG_ESP_FACE_DETECT_ENABLED 0
 #define CONFIG_ESP_FACE_RECOGNITION_ENABLED 0
-#endif
 
-#if CONFIG_ESP_FACE_DETECT_ENABLED
-
-#include <vector>
-#include "human_face_detect_msr01.hpp"
-#include "human_face_detect_mnp01.hpp"
-
-#define TWO_STAGE 1 /*<! 1: detect by two-stage which is more accurate but slower(with keypoints). */
-                    /*<! 0: detect by one-stage which is less accurate but faster(without keypoints). */
-
-#if CONFIG_ESP_FACE_RECOGNITION_ENABLED
-#include "face_recognition_tool.hpp"
-#include "face_recognition_112_v1_s16.hpp"
-#include "face_recognition_112_v1_s8.hpp"
-
-#define QUANT_TYPE 0 //if set to 1 => very large firmware, very slow, reboots when streaming...
-
-#define FACE_ID_SAVE_NUMBER 7
-#endif
-
-#define FACE_COLOR_WHITE 0x00FFFFFF
-#define FACE_COLOR_BLACK 0x00000000
-#define FACE_COLOR_RED 0x000000FF
-#define FACE_COLOR_GREEN 0x0000FF00
-#define FACE_COLOR_BLUE 0x00FF0000
-#define FACE_COLOR_YELLOW (FACE_COLOR_RED | FACE_COLOR_GREEN)
-#define FACE_COLOR_CYAN (FACE_COLOR_BLUE | FACE_COLOR_GREEN)
-#define FACE_COLOR_PURPLE (FACE_COLOR_BLUE | FACE_COLOR_RED)
-#else
 #define COLOR_GREEN 0x0000FF00
 #define COLOR_RED 0x00FF0000
 #define COLOR_BLUE 0x000000FF
-#endif
 
 // Enable LED FLASH setting
 #define CONFIG_LED_ILLUMINATOR_ENABLED 1
@@ -101,32 +60,6 @@ static const char *_STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %
 
 httpd_handle_t stream_httpd = NULL;
 httpd_handle_t camera_httpd = NULL;
-
-#if CONFIG_ESP_FACE_DETECT_ENABLED
-
-static int8_t detection_enabled = 0;
-
-// #if TWO_STAGE
-// static HumanFaceDetectMSR01 s1(0.1F, 0.5F, 10, 0.2F);
-// static HumanFaceDetectMNP01 s2(0.5F, 0.3F, 5);
-// #else
-// static HumanFaceDetectMSR01 s1(0.3F, 0.5F, 10, 0.2F);
-// #endif
-
-#if CONFIG_ESP_FACE_RECOGNITION_ENABLED
-static int8_t recognition_enabled = 0;
-static int8_t is_enrolling = 0;
-
-#if QUANT_TYPE
-    // S16 model
-    FaceRecognition112V1S16 recognizer;
-#else
-    // S8 model
-    FaceRecognition112V1S8 recognizer;
-#endif
-#endif
-
-#endif
 
 typedef struct
 {
@@ -278,17 +211,6 @@ static esp_err_t capture_handler(httpd_req_t *req)
     snprintf(ts, 32, "%ld.%06ld", fb->timestamp.tv_sec, fb->timestamp.tv_usec);
     httpd_resp_set_hdr(req, "X-Timestamp", (const char *)ts);
 
-#if CONFIG_ESP_FACE_DETECT_ENABLED
-    size_t out_len, out_width, out_height;
-    uint8_t *out_buf;
-    bool s;
-#if ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_INFO
-    bool detected = false;
-#endif
-    int face_id = 0;
-    if (!detection_enabled || fb->width > 400)
-    {
-#endif
 #if ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_INFO
         size_t fb_len = 0;
 #endif
@@ -619,28 +541,6 @@ static esp_err_t cmd_handler(httpd_req_t *req)
     }
 #endif
 
-#if CONFIG_ESP_FACE_DETECT_ENABLED
-    else if (!strcmp(variable, "face_detect")) {
-        detection_enabled = val;
-#if CONFIG_ESP_FACE_RECOGNITION_ENABLED
-        if (!detection_enabled) {
-            recognition_enabled = 0;
-        }
-#endif
-    }
-#if CONFIG_ESP_FACE_RECOGNITION_ENABLED
-    else if (!strcmp(variable, "face_enroll")){
-        is_enrolling = !is_enrolling;
-        log_i("Enrolling: %s", is_enrolling?"true":"false");
-    }
-    else if (!strcmp(variable, "face_recognize")) {
-        recognition_enabled = val;
-        if (recognition_enabled) {
-            detection_enabled = val;
-        }
-    }
-#endif
-#endif
     else {
         log_i("Unknown command: %s", variable);
         res = -1;
@@ -725,13 +625,6 @@ static esp_err_t status_handler(httpd_req_t *req)
     p += sprintf(p, ",\"led_intensity\":%u", led_duty);
 #else
     p += sprintf(p, ",\"led_intensity\":%d", -1);
-#endif
-#if CONFIG_ESP_FACE_DETECT_ENABLED
-    p += sprintf(p, ",\"face_detect\":%u", detection_enabled);
-#if CONFIG_ESP_FACE_RECOGNITION_ENABLED
-    p += sprintf(p, ",\"face_enroll\":%u,", is_enrolling);
-    p += sprintf(p, "\"face_recognize\":%u", recognition_enabled);
-#endif
 #endif
     *p++ = '}';
     *p++ = 0;
@@ -1074,12 +967,6 @@ void startCameraServer()
 
     ra_filter_init(&ra_filter, 20);
 
-#if CONFIG_ESP_FACE_RECOGNITION_ENABLED
-    recognizer.set_partition(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, "fr");
-
-    // load ids from flash partition
-    recognizer.set_ids_from_flash();
-#endif
     log_i("Starting web server on port: '%d'", config.server_port);
     if (httpd_start(&camera_httpd, &config) == ESP_OK)
     {

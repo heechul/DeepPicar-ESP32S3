@@ -21,7 +21,7 @@ NeuralNetwork *g_nn;
 #define WAIT_SERIAL 1 // 1: wait for serial monitor, 0: don't wait
 
 #if SETUP_AP==1
-const char* ssid = "ESP32S3";
+const char* ssid = "ESP32S3-DR";
 const char* password = "123456789"; 
 #else
 const char* ssid = "";

@@ -10,8 +10,8 @@
 #include "tensorflow/lite/schema/schema_generated.h"
 
 // input image size
-#define INPUT_W 80
-#define INPUT_H 60
+#define INPUT_W 160
+#define INPUT_H 120
 #define INPUT_C 3
 #define USE_CROP 0 // 1: use crop, 0: use resize
 

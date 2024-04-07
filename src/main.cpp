@@ -3,7 +3,7 @@
 #include "NeuralNetwork.h"
 
 // enable deeppicar dnn by default
-int g_use_dnn = 0; // set by web server
+int g_use_dnn = 1; // set by web server
 
 // DNN model pointer
 NeuralNetwork *g_nn;

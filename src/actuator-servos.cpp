@@ -11,6 +11,8 @@ int fr_pwm_Pin = 4; // forward/reverse throttle
 int throttlePwmChannel = 0;
 int steeringPwmChannel = 1;
 
+void servors_test();
+
 void setup_control() {
   // sets the pins as outputs:
   pinMode(lr_pwm_Pin, OUTPUT);
@@ -24,12 +26,14 @@ void setup_control() {
   ledcSetup(steeringPwmChannel, 50, 14);
   ledcAttachPin(lr_pwm_Pin, steeringPwmChannel);
   ledcWrite(steeringPwmChannel, 0);
+
+  servors_test();
 }
 
 void set_throttle(int throttle_pct)
 {
   int duty_us = map(throttle_pct, -100, 100, 900, 1700);
-  int duty = map(duty_us, 900, 1700, 0, 16383);
+  int duty = duty_us * 16383 / 20000;
   printf("%s:duty_us: %d, duty: %d\n", __FUNCTION__, duty_us, duty);
   ledcWrite(throttlePwmChannel, duty);
 }
@@ -37,7 +41,7 @@ void set_throttle(int throttle_pct)
 void set_steering(int steering_deg)
 {
   int duty_us = map(steering_deg, -90, 90, 544, 2400);
-  int duty = map(duty_us, 544, 2400, 0, 16383);
+  int duty = duty_us * 16383 / 20000;
   printf("%s:duty_us: %d, duty: %d\n", __FUNCTION__, duty_us, duty);
   ledcWrite(steeringPwmChannel, duty);
 }
@@ -89,4 +93,47 @@ void throttledown()
   set_throttle(throttle_pct);
 }
 
+void servors_test()
+{
+  // receive input from serial monitor to control ESC
+  // 
+  // PWM values for throttle set by the serial monitor
+  //  900 - 1300  reverse
+  // 1300 - stop  neutral, arming the servor
+  // 1300 - 1700  forward
+
+  while(1)  {
+    if (Serial.available() > 0) {
+      char c = Serial.read();
+      switch (c) {
+        case 'a':
+          forward();
+          break;
+        case 's':
+          nomove();
+          break;
+        case 'z':
+          backward();
+          break;
+        case 'i':
+          throttleup();
+          break;
+        case ',':
+          throttledown();
+          break;
+        case 'j':
+          left();
+          break;
+        case 'k':
+          center();
+          break;
+        case 'l':
+          right();
+          break;
+        default:
+          break;
+      }
+    }
+  }
+}
 #endif // ACTUATOR_8835

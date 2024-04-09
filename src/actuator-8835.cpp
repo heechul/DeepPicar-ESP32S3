@@ -3,15 +3,15 @@
 #ifdef ACTUATOR_8835
 #include <Arduino.h>
 
-int lr_dir_Pin = 1; // left/right direction
-int fr_dir_Pin = 2; // forward/reverse direction
-int lr_pwm_Pin = 3; // left/right throttle
-int fr_pwm_Pin = 4; // forward/reverse throttle
+static int lr_dir_Pin = 1; // left/right direction
+static int fr_dir_Pin = 2; // forward/reverse direction
+static int lr_pwm_Pin = 3; // left/right throttle
+static int fr_pwm_Pin = 4; // forward/reverse throttle
 
 // Setting PWM properties
 
-int dutyCycle = 225;
-int pwmChannel = 0;
+static int dutyCycle = 225;
+static int pwmChannel = 0;
 
 void setup_control() {
   // sets the pins as outputs:
@@ -55,16 +55,21 @@ void center() {
 
 void set_throttle(int throttle_pct)
 {
-  int tmp = throttle_pct * 255 / 100;
+  int tmp = abs(throttle_pct) * 255 / 100;
   if (tmp < 256 && tmp >= 0) dutyCycle = tmp;
-  run();
+ 
+  if (throttle_pct < 0) {
+    backward();
+  } else if (throttle_pct >= 0) {
+    forward();
+  }
 }
 
 void set_steering(int steering_deg)
 {
-  if (steering_deg < 0) {
+  if (steering_deg < -10) {
     left();
-  } else if (steering_deg > 0) {
+  } else if (steering_deg > 10) {
     right();
   } else {
     center();

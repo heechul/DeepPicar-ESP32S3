@@ -240,15 +240,7 @@ static esp_err_t capture_handler(httpd_req_t *req)
 
 #include <Arduino.h>
 
-extern void left();
-extern void right();
-extern void center();
-extern void forward();
-extern void backward();
-extern void throttleup();
-extern void throttledown();
-extern void set_throttle(int);
-extern void nomove();
+#include "control.h"
 
 extern int g_use_dnn; // defined in src/main.cpp
 
@@ -449,39 +441,42 @@ static esp_err_t cmd_handler(httpd_req_t *req)
     //   Serial.println("Backward");
     //   backward();
     // }
-    if(!strcmp(variable, "throttleup")) {
-      Serial.println("Throttle Up");
-      throttleup();
-    }
-    else if(!strcmp(variable, "throttledown")) {
-      Serial.println("Throttle Down");
-      throttledown();
-    }
-    else if(!strcmp(variable, "stop")) {
-      Serial.println("Stop");
-      nomove(); 
-    }
-    else if(!strcmp(variable, "left")) {
-      Serial.println("Left");
-      left();
-    }
-    else if(!strcmp(variable, "right")) {
-      Serial.println("Right");
-      right();
-    }
-    else if(!strcmp(variable, "center")) {
-      Serial.println("Center");
-      center();
-    }
-    else if(!strcmp(variable, "auto")) {
+    // if(!strcmp(variable, "throttleup")) {
+    //   Serial.println("Throttle Up");
+    //   throttleup();
+    // }
+    // else if(!strcmp(variable, "throttledown")) {
+    //   Serial.println("Throttle Down");
+    //   throttledown();
+    // }
+    // else if(!strcmp(variable, "stop")) {
+    //   Serial.println("Stop");
+    //   set_throttle(0); 
+    // }
+    // else if(!strcmp(variable, "left")) {
+    //   Serial.println("Left");
+    //   left();
+    // }
+    // else if(!strcmp(variable, "right")) {
+    //   Serial.println("Right");
+    //   right();
+    // }
+    // else if(!strcmp(variable, "center")) {
+    //   Serial.println("Center");
+    //   center();
+    // }
+    if(!strcmp(variable, "auto")) {
       Serial.println("Autonomous mode");
       g_use_dnn = 1;
     } else if(!strcmp(variable, "manual")) {
       Serial.println("Manual mode");
       g_use_dnn = 0;
-    } else if(!strcmp(variable, "throttle")) {
+    } else if(!strcmp(variable, "throttle_pct")) {
       Serial.printf("Updated throttle: %d pct\n", val);
       set_throttle(val);
+    } else if(!strcmp(variable, "steering_deg")) {
+      Serial.printf("Updated steering: %d deg\n", val);
+      set_steering(val);
     } else if (!strcmp(variable, "framesize")) {
         if (s->pixformat == PIXFORMAT_JPEG) {
             res = s->set_framesize(s, (framesize_t)val);

@@ -34,7 +34,6 @@ void setup_control() {
 void run() {
   ledcWrite(pwmChannel, dutyCycle);  
 }
-
 void forward() {
   digitalWrite(f_Pin, HIGH);
   digitalWrite(b_Pin, LOW);
@@ -57,11 +56,25 @@ void center() {
   digitalWrite(l_Pin, LOW);
   digitalWrite(r_Pin, LOW);
 }
+
 void set_throttle(int throttle_pct)
 {
   int tmp = throttle_pct * 255 / 100;
   if (tmp < 256 && tmp >= 0) dutyCycle = tmp;
+  run();
 }
+
+void set_steering(int deg)
+{
+  if (deg < 0) {
+    left();
+  } else if (deg > 0) {
+    right();
+  } else {
+    center();
+  }
+} 
+
 void throttleup() {
   if (dutyCycle < 255) {
     dutyCycle += 5;
@@ -74,6 +87,7 @@ void throttledown() {
     run();
   }
 }
+
 void nomove() {
   ledcWrite(pwmChannel, 0);  
 }

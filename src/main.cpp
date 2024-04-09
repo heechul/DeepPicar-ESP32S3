@@ -348,7 +348,7 @@ void loop() {
   //   printf("left (%d) by CPU", deg);
   // }
   set_steering(deg);
-  printf(": angle=%.3f q=%d\n", angle, q);
+  printf("deg=%d (%.3f q=%d)\n", deg, angle, q);
 
   if (fb)
   {

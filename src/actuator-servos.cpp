@@ -27,7 +27,7 @@ void setup_control() {
   ledcAttachPin(lr_pwm_Pin, steeringPwmChannel);
   ledcWrite(steeringPwmChannel, 0);
 
-  servors_test();
+  // servors_test();
 }
 
 // throttle_pct: -100 to 100

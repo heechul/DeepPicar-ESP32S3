@@ -57,7 +57,20 @@ void set_throttle(int throttle_pct)
 {
   int tmp = throttle_pct * 255 / 100;
   if (tmp < 256 && tmp >= 0) dutyCycle = tmp;
+  run();
 }
+
+void set_steering(int steering_deg)
+{
+  if (steering_deg < 0) {
+    left();
+  } else if (steering_deg > 0) {
+    right();
+  } else {
+    center();
+  }
+}
+
 void throttleup() {
   if (dutyCycle < 255) {
     dutyCycle += 5;

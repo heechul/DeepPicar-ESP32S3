@@ -51,9 +51,9 @@ void set_steering(int steering_deg)
 }
 
 // steering
-int steering_deg = 0;
+static int steering_deg = 0;
 
-void right() 
+static void right() 
 {
   if (steering_deg < 90)
   {
@@ -75,7 +75,7 @@ void center() {
 }
 
 // throttle
-int throttle_pct = 0;
+static int throttle_pct = 0;
 
 void nomove()
 {

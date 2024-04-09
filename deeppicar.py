@@ -28,7 +28,6 @@ cfg_cam_res = (160, 120)
 cfg_cam_fps = 30
 enable_ondevice_dnn = False
 frame_id = 0
-angle = 0.0
 period = 0.05 # sec (=50ms)
 
 ##########################################################
@@ -99,27 +98,27 @@ def overlay_image(l_img, s_img, x_offset, y_offset):
                   (1.0 - s_img[:,:,3]/255.0))
     return l_img
 
-def get_action(angle):
-    degree = rad2deg(angle)
-    if degree <= -args.turnthresh:
-        return "left"
-    elif degree < args.turnthresh and degree > -args.turnthresh:
-        return "center"
-    elif degree >= args.turnthresh:
-        return "right"
-    else:
-        return "unknown"
+# def get_action(angle):
+#     degree = rad2deg(angle)
+#     if degree <= -args.turnthresh:
+#         return "left"
+#     elif degree < args.turnthresh and degree > -args.turnthresh:
+#         return "center"
+#     elif degree >= args.turnthresh:
+#         return "right"
+#     else:
+#         return "unknown"
 
-def put_action(angle):
-    degree = rad2deg(angle)
-    if degree <= -args.turnthresh:
-        actuator.left()
-    elif degree < args.turnthresh and degree > -args.turnthresh:
-        actuator.center()
-    elif degree >= args.turnthresh:
-        actuator.right()
-    else:
-        actuator.stop()
+# def put_action(angle):
+#     degree = rad2deg(angle)
+#     if degree <= -args.turnthresh:
+#         actuator.left()
+#     elif degree < args.turnthresh and degree > -args.turnthresh:
+#         actuator.center()
+#     elif degree >= args.turnthresh:
+#         actuator.right()
+#     else:
+#         actuator.stop()
 
 def print_stats(execution_times):
     # Calculate statistics
@@ -165,7 +164,7 @@ def measure_execution_time(func, num_trials):
 parser = argparse.ArgumentParser(description='DeepPicar main')
 parser.add_argument("-d", "--dnn", help="Enable DNN", action="store_true", default=False)
 parser.add_argument("-p", "--prob_dnn", help="probability of using DNN", type=float, default=1.0)
-parser.add_argument("-t", "--throttle", help="throttle percent. [0-100]%", type=int, default=100)
+parser.add_argument("-t", "--throttle", help="throttle percent. [0-100]%", type=int, default=0)
 parser.add_argument("--turnthresh", help="throttle percent. [0-30]degree", type=int, default=10)
 parser.add_argument("-n", "--ncpu", help="number of cores to use.", type=int, default=2)
 parser.add_argument("-f", "--hz", help="control frequnecy", type=int)
@@ -243,8 +242,12 @@ frame_arr = []
 angle_arr = []
 dnn_times = []
 action_times = []
-angle = dnn_angle = 0.0
-prev_steering_angle = -1
+throttle_pct = 0
+steering_deg = 0
+prev_throttle_pct = -1
+prev_steering_deg = -1
+dnn_steering_deg = 0
+
 stext = ""
 
 temporal_context_buffer = []
@@ -263,36 +266,29 @@ while True:
     
     # process input
     if ch == ord('j'): # left 
-        angle = deg2rad(-30)
-        print ("left")
+        steering_deg = -30
     elif ch == ord('k'): # center 
-        angle = deg2rad(0)
-        print ("center")
+        steering_deg = 0
     elif ch == ord('l'): # right
-        angle = deg2rad(30)
-        print ("right")
+        steering_deg = 30
+    elif ch == ord('u'):
+        steering_deg += -10
+    elif ch == ord('o'):
+        steering_deg += 10
     elif ch == ord('a'): # accel
-        actuator.ffw()
-        print ("accel")
+        throttle_pct += 5
         start_ts = ts
+    elif ch == ord('z'): # reverse
+        throttle_pct += -5
     elif ch == ord('s'): # stop
-        actuator.stop()
+        throttle_pct = 0 
         actuator.manual()
         print ("stop")
         print ("duration: %.2f" % (ts - start_ts))
         enable_record = False # stop recording as well 
         args.dnn = False # manual mode
         enable_ondevice_dnn = False
-    elif ch == ord('z'): # reverse
-        actuator.rew()
-        print ("reverse")
-    elif ch == ord('i'):
-        actuator.throttleup()
-        print ("throttle up")
-    elif ch == ord(','):
-        actuator.throttledown()
-        print ("thtotle down")
-    elif ch == ord('n'):
+    elif ch == ord('n'):    
         actuator.auto()
         enable_ondevice_dnn = True
         print ("auto: Ondevice DNN enabled")
@@ -349,13 +345,18 @@ while True:
         # dnn latency measurement
         dnn_times.append(time.time() - ts)
 
-        # print('dnn_angle:', dnn_angle, rad2deg(dnn_angle))        
+        dnn_steering_deg = rad2deg(dnn_angle)
+        dnn_throttle_pct = throttle_pct
+
         # 3. actuator output. 
         #    50% of time choose dnn_angle, while chooing angle for the rest 
         if np.random.rand() < args.prob_dnn:
-            put_action(dnn_angle)
+            actuator.set_steering(dnn_steering_deg)
+            actuator.set_throttle(dnn_throttle_pct)
         else:
-            put_action(angle)
+            actuator.set_steering(steering_deg)
+            actuator.set_throttle(throttle_pct)
+    
         # latency measurement
         action_times.append(time.time() - ts)
     elif enable_ondevice_dnn == True:
@@ -363,7 +364,10 @@ while True:
         pass    # do nothing. 
     else:
         # manual mode
-        put_action(angle)
+        if prev_steering_deg != steering_deg: 
+            actuator.set_steering(steering_deg)
+        if prev_throttle_pct != throttle_pct:
+            actuator.set_throttle(throttle_pct)
 
     dur = time.time() - ts
     if dur > period:
@@ -374,7 +378,7 @@ while True:
     
     if view_video == True:
         if args.dnn == True:
-            if get_action(angle) == get_action(dnn_angle):
+            if abs(steering_deg - dnn_steering_deg) < 5:
                 textColor = (0, 255, 0)
             else:
                 textColor = (255,0,0)
@@ -406,7 +410,7 @@ while True:
         frame_id += 1
 
         # write input (angle)
-        str = "{},{},{},{}\n".format(int(ts*1000), frame_id, angle, dnn_angle)
+        str = "{},{},{},{}\n".format(int(ts*1000), frame_id, deg2rad(steering_deg), dnn_angle)
         keyfile.write(str)
 
         # write video stream
@@ -417,14 +421,14 @@ while True:
             print ("recorded 1000 frames")
             break
         if frame_id % 10 == 0: 
-            print ("%.3f %d %.3f %d(ms)" %(ts, frame_id, angle, int((time.time() - ts)*1000)))
+            print ("%.3f %d %.3f %d(ms)" %(ts, frame_id, steering_deg, int((time.time() - ts)*1000)))
     
     # update previous steering angle
-    stext = "EXP: %s, AI: %s" % (get_action(angle), get_action(dnn_angle))
-
-    if prev_steering_angle != angle:
-        print(stext)
-        prev_steering_angle = angle
+    stext = "EXP: %2d - AI: %2d" % (steering_deg, dnn_steering_deg)
+    if prev_steering_deg != steering_deg or prev_throttle_pct != throttle_pct:
+        prev_steering_deg = steering_deg
+        prev_throttle_pct = throttle_pct
+        print (stext)
 
 print ("Finish..")
 if len(dnn_times) > 0:

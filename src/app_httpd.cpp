@@ -441,15 +441,15 @@ static esp_err_t cmd_handler(httpd_req_t *req)
     sensor_t *s = esp_camera_sensor_get();
     int res = 0;
 
-    if(!strcmp(variable, "forward")) {
-      Serial.println("Forward");
-      forward();
-    }
-    else if(!strcmp(variable, "backward")) {
-      Serial.println("Backward");
-      backward();
-    }
-    else if(!strcmp(variable, "throttleup")) {
+    // if(!strcmp(variable, "forward")) {
+    //   Serial.println("Forward");
+    //   forward();
+    // }
+    // else if(!strcmp(variable, "backward")) {
+    //   Serial.println("Backward");
+    //   backward();
+    // }
+    if(!strcmp(variable, "throttleup")) {
       Serial.println("Throttle Up");
       throttleup();
     }

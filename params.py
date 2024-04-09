@@ -23,8 +23,8 @@ inputdev="input-kbd"
 # model input config 
 #   160x120x3 or 80x60x3 or 40x30x3
 ##########################################################
-img_width = 160
-img_height = 120
+img_width = 80
+img_height = 60
 img_channels = 3
 temporal_context = 1
 ##########################################################

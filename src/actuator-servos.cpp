@@ -30,16 +30,20 @@ void setup_control() {
   servors_test();
 }
 
+// throttle_pct: -100 to 100
 void set_throttle(int throttle_pct)
 {
+  throttle_pct = -throttle_pct;
   int duty_us = map(throttle_pct, -100, 100, 900, 1700);
   int duty = duty_us * 16383 / 20000;
   printf("%s:duty_us: %d, duty: %d\n", __FUNCTION__, duty_us, duty);
   ledcWrite(throttlePwmChannel, duty);
 }
 
+// steering_deg: -90 to 90
 void set_steering(int steering_deg)
 {
+  steering_deg = -steering_deg;
   int duty_us = map(steering_deg, -90, 90, 544, 2400);
   int duty = duty_us * 16383 / 20000;
   printf("%s:duty_us: %d, duty: %d\n", __FUNCTION__, duty_us, duty);
@@ -47,34 +51,36 @@ void set_steering(int steering_deg)
 }
 
 // steering
+int steering_deg = 0;
+
+void right() 
+{
+  if (steering_deg < 90)
+  {
+    steering_deg += 10;
+  }
+  set_steering(steering_deg);
+}
 void left() 
 {
-  set_steering(-30);
-}
-void right()
-{
-  set_steering(30);
+  if (steering_deg > -90)
+  {
+    steering_deg -= 10;
+  }
+  set_steering(steering_deg);
 }
 void center() {
-  set_steering(0);
+  steering_deg = 0;
+  set_steering(steering_deg);
 }
 
 // throttle
 int throttle_pct = 0;
 
-void forward() 
-{
-  throttle_pct = 10;
-  set_throttle(throttle_pct);
-}
-void backward() 
-{
-  throttle_pct = -10;
-  set_throttle(throttle_pct);
-}
 void nomove()
 {
-  set_throttle(0);
+  throttle_pct = 0;
+  set_throttle(throttle_pct);
 }
 void throttleup() 
 {
@@ -106,19 +112,13 @@ void servors_test()
     if (Serial.available() > 0) {
       char c = Serial.read();
       switch (c) {
-        case 'a':
-          forward();
-          break;
         case 's':
           nomove();
           break;
-        case 'z':
-          backward();
-          break;
-        case 'i':
+        case 'a':
           throttleup();
           break;
-        case ',':
+        case 'z':
           throttledown();
           break;
         case 'j':

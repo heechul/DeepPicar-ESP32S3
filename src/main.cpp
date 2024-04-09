@@ -332,21 +332,22 @@ void loop() {
 
   int deg = (int)rad2deg(angle);
   
-  if (deg < 10 and deg > -10) 
-  {
-    center();
-    printf("center (%d) by CPU", deg);
-  } 
-  else if (deg >= 10) 
-  {
-    right();
-    printf("right (%d) by CPU", deg);
-  } 
-  else if (deg <= -10) 
-  {
-    left();
-    printf("left (%d) by CPU", deg);
-  }
+  // if (deg < 10 and deg > -10) 
+  // {
+  //   center();
+  //   printf("center (%d) by CPU", deg);
+  // } 
+  // else if (deg >= 10) 
+  // {
+  //   right();
+  //   printf("right (%d) by CPU", deg);
+  // } 
+  // else if (deg <= -10) 
+  // {
+  //   left();
+  //   printf("left (%d) by CPU", deg);
+  // }
+  set_steering(deg);
   printf(": angle=%.3f q=%d\n", angle, q);
 
   if (fb)

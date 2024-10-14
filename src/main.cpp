@@ -12,6 +12,8 @@ NeuralNetwork *g_nn;
 
 #include "camera_pins.h"
 
+#define ACTUATOR_8835 1
+
 #include "control.h" // motor control
 
 // ===========================

@@ -1,6 +1,5 @@
-#define ACTUATOR_SERVOS
-
-#ifdef ACTUATOR_SERVOS
+// #define CONFIG_ACTUATOR_SERVOS 1
+#ifdef CONFIG_ACTUATOR_SERVOS
 #include <Arduino.h>
 
 int lr_pwm_Pin = 3; // left/right throttle

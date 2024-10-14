@@ -1,6 +1,6 @@
-// #define ACTUATOR_L294
+// #define CONFIG_ACTUATOR_L294
 
-#ifdef ACTUATOR_L294
+#ifdef CONFIG_ACTUATOR_L294
 #include <Arduino.h>
 
 int l_Pin = 1; // left

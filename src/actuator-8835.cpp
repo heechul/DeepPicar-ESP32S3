@@ -1,6 +1,6 @@
-// #define ACTUATOR_8835
+// #define CONFIG_ACTUATOR_8835
 
-#ifdef ACTUATOR_8835
+#ifdef CONFIG_ACTUATOR_8835
 #include <Arduino.h>
 
 static int lr_dir_Pin = 1; // left/right direction

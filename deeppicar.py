@@ -410,7 +410,7 @@ while True:
         frame_id += 1
 
         # write input (angle)
-        str = "{},{},{},{}\n".format(int(ts*1000), frame_id, deg2rad(steering_deg), dnn_angle)
+        str = "{},{},{}\n".format(int(ts*1000), frame_id, deg2rad(steering_deg))
         keyfile.write(str)
 
         # write video stream

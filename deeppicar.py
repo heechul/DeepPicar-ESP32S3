@@ -242,7 +242,7 @@ frame_arr = []
 angle_arr = []
 dnn_times = []
 action_times = []
-throttle_pct = 0
+throttle_pct = args.throttle
 steering_deg = 0
 prev_throttle_pct = -1
 prev_steering_deg = -1
@@ -423,8 +423,8 @@ while True:
         if frame_id % 10 == 0: 
             print ("%.3f %d %.3f %d(ms)" %(ts, frame_id, steering_deg, int((time.time() - ts)*1000)))
     
-    # update previous steering angle
-    stext = "EXP: %2d - AI: %2d" % (steering_deg, dnn_steering_deg)
+    # update previous steering angle and throttle
+    stext = "EXP: %2d - AI: %2d, Throttle=%2d" % (steering_deg, dnn_steering_deg, throttle_pct)
     if prev_steering_deg != steering_deg or prev_throttle_pct != throttle_pct:
         prev_steering_deg = steering_deg
         prev_throttle_pct = throttle_pct

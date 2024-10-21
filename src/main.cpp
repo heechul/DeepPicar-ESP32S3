@@ -1,3 +1,9 @@
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_timer.h"
+#include "esp_system.h"
+#include <stdio.h>
+
 #include "esp_camera.h"
 #include <WiFi.h>
 #include "NeuralNetwork.h"
@@ -30,10 +36,26 @@ const char* password = "";
 
 void startCameraServer();
 void setupLedFlash(int pin);
+void dnn_loop();
 
+// Function to be run on core 0
+void taskCore0(void *pvParameters) {
+  while (true) {
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+
+    if (g_use_dnn) {
+      dnn_loop();
+      vTaskDelay(1);
+    } else {
+      BaseType_t xWasDelayd = xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000)); // 1fps
+      // print core id, task name, task priority
+      printf("Core%d: %s (prio=%d, delayed=%d)\n", 
+        xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL), xWasDelayd);
+    }
+  }
+}
 
 void setup() {
-
   Serial.begin(115200);
 #if WAIT_SERIAL==1
   while(!Serial) {
@@ -140,13 +162,42 @@ void setup() {
   Serial.println("' to connect");
 #endif
 
+  // printf("wifi_task_core_id: %d\n", CONFIG_ESP32_WIFI_TASK_CORE_ID);
+
   startCameraServer();
+
+  // Create a task pinned to core 0
+  xTaskCreatePinnedToCore(
+      taskCore0,   // Function to be called
+      "TaskCore0", // Name of the task
+      10000,       // Stack size (bytes)
+      NULL,        // Parameter to pass
+      2,           // Task priority
+      NULL,        // Task handle
+      0            // Core to run the task on (0 or 1)
+  );
 
   // setup motor control
   setup_control();
 
   // register pilotnet algo
   g_nn = new NeuralNetwork();
+
+  // end of init
+  Serial.println("Ready");
+
+}
+
+void loop() {
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+
+  // print core id, task name, task priority
+  printf("Core%d: %s (prio=%d)\n",
+    xPortGetCoreID(), 
+    pcTaskGetName(NULL),
+    uxTaskPriorityGet(NULL));
+
+  BaseType_t xWasDelayd = xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000));
 
 }
 
@@ -280,17 +331,11 @@ int GetAction(float rad)
     return -1;
 }
 
-void loop() {
-
+void dnn_loop()
+{
   camera_fb_t *fb = NULL;
   int64_t fr_begin, fr_cap, fr_pre, fr_dnn;
   static int64_t last_frame = 0;
-
-  if (g_use_dnn == 0)
-  {
-      // Use pilotnet algorithm
-      return;
-  }
 
   fr_begin = esp_timer_get_time();
 
@@ -357,8 +402,10 @@ void loop() {
   }
   int64_t fr_end = esp_timer_get_time();
   int64_t frame_time = (fr_end - last_frame)/1000;
-  if (g_use_dnn) printf("Core%d:  %ums (%.1ffps): cap=%dms, pre=%dms, dnn=%dms\n", 
-      xPortGetCoreID(), (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time,
+  if (g_use_dnn) printf("Core%d: %s (prio=%d) %ums (%.1ffps): cap=%dms, pre=%dms, dnn=%dms\n", 
+      xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL), 
+      (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time,
       (int)((fr_cap-fr_begin)/1000), (int)((fr_pre-fr_cap)/1000), (int)((fr_dnn-fr_pre)/1000));
-  last_frame = fr_end;
+
+  last_frame = fr_end;  
 }

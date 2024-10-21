@@ -172,6 +172,7 @@ parser.add_argument("--fpvvideo", help="Take FPV video of DNN driving", action="
 parser.add_argument("--use_tensorflow", help="use the full tensorflow instead of tflite", action="store_true")
 parser.add_argument("--pre", help="preprocessing [resize|crop]", type=str, default="resize")
 parser.add_argument("--int8", help="use int8 quantized model", action="store_true", default=True)
+parser.add_argument("--use_LET", help="use LET", action="store_true", default=False)    
 args = parser.parse_args()
 
 if args.dnn:
@@ -193,6 +194,7 @@ print("period (sec):", period)
 print("preprocessing:", args.pre)
 print("use_int8:", args.int8)
 print("prob_dnn:", args.prob_dnn)
+print("use_LET:", args.use_LET)
 
 ##########################################################
 # import deeppicar's DNN model
@@ -241,27 +243,27 @@ start_ts = time.time()
 frame_arr = []
 angle_arr = []
 dnn_times = []
-action_times = []
 throttle_pct = args.throttle
 steering_deg = 0
 prev_throttle_pct = -1
 prev_steering_deg = -1
 dnn_steering_deg = 0
-
 stext = ""
 
 temporal_context_buffer = []
 # enter main loop
+
+time.sleep(next(g))
+
 while True:
-    if use_thread:
-        time.sleep(next(g))
+    ts = time.time()
+
     frame = camera.read_frame()
     if frame is None:
         print("frame is None")
         break
-    ts = time.time()
-
-    # receive input (must be non blocking)
+  
+    # if there's key input, receive the input (must be non blocking)
     ch = inputdev.read_single_event()
     
     # process input
@@ -312,6 +314,8 @@ while True:
     elif ch == ord('q'):
         break
 
+
+    # if AI is enabled, run the DNN model
     if args.dnn == True:
         # AI enabled mode
         # 1. machine input
@@ -348,26 +352,17 @@ while True:
         dnn_steering_deg = rad2deg(dnn_angle)
         dnn_throttle_pct = throttle_pct
 
-        # 3. actuator output. 
-        #    50% of time choose dnn_angle, while chooing angle for the rest 
-        if np.random.rand() < args.prob_dnn:
+    # actuate the car immediately if LET is not enabled
+    if args.use_LET == False:
+       #  args.prob_dnn*100 percent of time choose dnn_angle, while chooing angle for the rest 
+        if args.dnn == True and np.random.rand() < args.prob_dnn:
             actuator.set_steering(dnn_steering_deg)
             actuator.set_throttle(dnn_throttle_pct)
         else:
-            actuator.set_steering(steering_deg)
-            actuator.set_throttle(throttle_pct)
-    
-        # latency measurement
-        action_times.append(time.time() - ts)
-    elif enable_ondevice_dnn == True:
-        # AI enabled mode
-        pass    # do nothing. 
-    else:
-        # manual mode
-        if prev_steering_deg != steering_deg: 
-            actuator.set_steering(steering_deg)
-        if prev_throttle_pct != throttle_pct:
-            actuator.set_throttle(throttle_pct)
+            if prev_steering_deg != steering_deg:
+                actuator.set_steering(steering_deg)
+            if prev_throttle_pct != throttle_pct:
+                actuator.set_throttle(throttle_pct)
 
     dur = time.time() - ts
     if dur > period:
@@ -396,7 +391,7 @@ while True:
         if frame_id == 0:
             # create files for data recording
             keyfile = open(params.rec_csv_file, 'w+')
-            keyfile.write("ts,frame,wheel,ai\n") # ts (ms)
+            keyfile.write("ts,frame,wheel,ai,throttle\n") # ts (ms)
             try:
                 fourcc = cv2.cv.CV_FOURCC(*'XVID')
             except AttributeError as e:
@@ -410,7 +405,7 @@ while True:
         frame_id += 1
 
         # write input (angle)
-        str = "{},{},{}\n".format(int(ts*1000), frame_id, deg2rad(steering_deg))
+        str = "{},{},{},{},{}\n".format(int(ts*1000), frame_id, deg2rad(steering_deg), deg2rad(dnn_steering_deg), throttle_pct)
         keyfile.write(str)
 
         # write video stream
@@ -422,19 +417,32 @@ while True:
             break
         if frame_id % 10 == 0: 
             print ("%.3f %d %.3f %d(ms)" %(ts, frame_id, steering_deg, int((time.time() - ts)*1000)))
-    
+
     # update previous steering angle and throttle
-    stext = "EXP: %2d - AI: %2d, Throttle=%2d" % (steering_deg, dnn_steering_deg, throttle_pct)
+    stext = "EXP: %2d - AI: %2d, Thr=%2d" % (steering_deg, dnn_steering_deg, throttle_pct)
     if prev_steering_deg != steering_deg or prev_throttle_pct != throttle_pct:
-        prev_steering_deg = steering_deg
-        prev_throttle_pct = throttle_pct
         print (stext)
+
+    # wait for the next period
+    time.sleep(next(g))
+
+    if args.use_LET == True:
+       #  args.prob_dnn*100 percent of time choose dnn_angle, while chooing angle for the rest 
+        if args.dnn == True and np.random.rand() < args.prob_dnn:
+            actuator.set_steering(dnn_steering_deg)
+            actuator.set_throttle(dnn_throttle_pct)
+        else:
+            if prev_steering_deg != steering_deg:
+                actuator.set_steering(steering_deg)
+            if prev_throttle_pct != throttle_pct:
+                actuator.set_throttle(throttle_pct)
+
+    prev_steering_deg = steering_deg
+    prev_throttle_pct = throttle_pct
+    # end of the main loop
 
 print ("Finish..")
 if len(dnn_times) > 0:
     print ("DNN latency measurements: {} trials".format(len(dnn_times)))
     print_stats(dnn_times)
-if len(action_times) > 0:
-    print ("Actuator latency measurements: {} trials".format(len(action_times)))
-    print_stats(action_times)
 turn_off()

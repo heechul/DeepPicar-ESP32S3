@@ -167,7 +167,7 @@ parser.add_argument("-p", "--prob_dnn", help="probability of using DNN", type=fl
 parser.add_argument("-t", "--throttle", help="throttle percent. [0-100]%", type=int, default=0)
 parser.add_argument("--turnthresh", help="throttle percent. [0-30]degree", type=int, default=10)
 parser.add_argument("-n", "--ncpu", help="number of cores to use.", type=int, default=2)
-parser.add_argument("-f", "--hz", help="control frequnecy", type=int)
+parser.add_argument("-f", "--hz", help="control frequnecy", type=int, default=20)
 parser.add_argument("--fpvvideo", help="Take FPV video of DNN driving", action="store_true")
 parser.add_argument("--use_tensorflow", help="use the full tensorflow instead of tflite", action="store_true")
 parser.add_argument("--pre", help="preprocessing [resize|crop]", type=str, default="resize")
@@ -291,13 +291,12 @@ while True:
         args.dnn = False # manual mode
         enable_ondevice_dnn = False
     elif ch == ord('n'):    
-        actuator.auto()
-        enable_ondevice_dnn = True
-        print ("auto: Ondevice DNN enabled")
-    elif ch == ord('b'):
-        actuator.manual()
-        enable_ondevice_dnn = False
-        print ("manual")
+        enable_ondevice_dnn = not enable_ondevice_dnn
+        if enable_ondevice_dnn:
+            actuator.auto()
+        else:
+            actuator.manual()
+        print ("Ondevice DNN:", enable_ondevice_dnn)
     elif ch == ord('m'):
         n_trials=1000
         print("actuator latency measumenets: {} trials".format(n_trials))

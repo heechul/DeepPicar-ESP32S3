@@ -19,14 +19,10 @@
 #include "fb_gfx.h"
 #include "esp32-hal-ledc.h"
 #include "sdkconfig.h"
-#include "camera_index.h"
 
 #if defined(ARDUINO_ARCH_ESP32) && defined(CONFIG_ARDUHAL_ESP_LOG)
 #include "esp32-hal-log.h"
 #endif
-
-#define CONFIG_ESP_FACE_DETECT_ENABLED 0
-#define CONFIG_ESP_FACE_RECOGNITION_ENABLED 0
 
 #define COLOR_GREEN 0x0000FF00
 #define COLOR_RED 0x00FF0000
@@ -128,6 +124,8 @@ void enable_led(bool en)
 
 extern int g_use_dnn; // defined in src/main.cpp
 
+// httpd handler for the stream
+// Core1, priority=5, stack=4096
 static esp_err_t stream_handler(httpd_req_t *req)
 {
     camera_fb_t *fb = NULL;
@@ -165,7 +163,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
             vTaskDelay(pdMS_TO_TICKS(1000));
         }
         
-        TickType_t xLastWakeTime = xTaskGetTickCount();
+        // TickType_t xLastWakeTime = xTaskGetTickCount();
 
         fr_pre = esp_timer_get_time();
 
@@ -257,12 +255,12 @@ static esp_err_t stream_handler(httpd_req_t *req)
         last_frame = fr_end;
 
         // sleep 
-        BaseType_t xWasDelayd = xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000 / 20)); // 10fps
-        if (xWasDelayd == pdFALSE) {
-            log_w("Task was blocked for longer than the set period");       
-        }
-        printf("Core%d: %s (prio=%d, delayed=%d): %u ms (%.1ffps): enc: %d ms\n",
-            xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL), xWasDelayd,
+        // BaseType_t xWasDelayd = xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000 / 20)); // 10fps
+        // if (xWasDelayd == pdFALSE) {
+        //     log_w("Task was blocked for longer than the set period");       
+        // }
+        printf("Core%d: %s (prio=%d): %u ms (%.1ffps): enc: %d ms\n",
+            xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL),
             (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time, (uint32_t)((fr_enc - fr_cap)/1000));            
     }
 
@@ -397,12 +395,3 @@ void startCameraServer()
     }
 }
 
-void setupLedFlash(int pin) 
-{
-    #if CONFIG_LED_ILLUMINATOR_ENABLED
-    ledcSetup(LED_LEDC_CHANNEL, 5000, 8);
-    ledcAttachPin(pin, LED_LEDC_CHANNEL);
-    #else
-    log_i("LED flash is disabled -> CONFIG_LED_ILLUMINATOR_ENABLED = 0");
-    #endif
-}

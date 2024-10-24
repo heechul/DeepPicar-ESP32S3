@@ -233,10 +233,15 @@ else:
     print('  zerop: ', zerop, 'scale: ', scale)
 
 # initlaize deeppicar modules
-actuator.init(args.throttle)
+print ("Initialize the camera")
 camera.init(res=cfg_cam_res, fps=cfg_cam_fps, threading=use_thread)
+
+print ("Initialize the actuators")
+actuator.init(args.throttle)
+
 atexit.register(turn_off)
 
+print ("Start the loop")
 g = g_tick()
 start_ts = time.time()
 
@@ -282,6 +287,10 @@ while True:
         start_ts = ts
     elif ch == ord('z'): # reverse
         throttle_pct += -5
+    elif ch == ord('i'): # increase speed to 50%
+        throttle_pct = 50
+    elif ch == ord(','): # decrease speed to -50%
+        throttle_pct = -50
     elif ch == ord('s'): # stop
         throttle_pct = 0 
         actuator.manual()

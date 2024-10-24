@@ -23,15 +23,15 @@ NeuralNetwork *g_nn;
 // ===========================
 // Enter your WiFi credentials
 // ===========================
-#define SETUP_AP 1 // 1: setup AP mode, 0: setup Station mode
+#define SETUP_AP 0 // 1: setup AP mode, 0: setup Station mode
 #define WAIT_SERIAL 1 // 1: wait for serial monitor, 0: don't wait
 
 #if SETUP_AP==1
 const char* ssid = "ESP32S3-DR";
 const char* password = "123456789"; 
 #else
-const char* ssid = "";
-const char* password = "";
+const char* ssid = "robocar";
+const char* password = "robocar1234";
 #endif
 
 void startCameraServer();
@@ -39,21 +39,23 @@ void setupLedFlash(int pin);
 void dnn_loop();
 
 // Function to be run on core 0
-void taskCore0(void *pvParameters) {
-  while (true) {
-    TickType_t xLastWakeTime = xTaskGetTickCount();
+// void taskCore0(void *pvParameters) {
+//   while (true) {
+//     TickType_t xLastWakeTime = xTaskGetTickCount();
 
-    if (g_use_dnn) {
-      dnn_loop();
-      vTaskDelay(1);
-    } else {
-      BaseType_t xWasDelayd = xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000)); // 1fps
-      // print core id, task name, task priority
-      printf("Core%d: %s (prio=%d, delayed=%d)\n", 
-        xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL), xWasDelayd);
-    }
-  }
-}
+//     if (g_use_dnn) {
+//       dnn_loop();
+//     }
+
+//     BaseType_t xWasDelayd = xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000 / 20)); // 20fps
+//     if (xWasDelayd == pdFALSE) {
+//         log_w("Task was blocked for longer than the set period");       
+//     }
+
+//     // printf("Core%d: %s (prio=%d, delayed=%d)\n", 
+//     //   xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL), xWasDelayd);
+//   }
+// }
 
 void setup() {
   Serial.begin(115200);
@@ -142,12 +144,17 @@ void setup() {
 #endif
 
 #if SETUP_AP==1
-  Serial.print("Setting AP (Access Point)…");
+  Serial.print("Setting AP (Access Point)");
+  WiFi.setTxPower(WIFI_POWER_19_5dBm);
   WiFi.softAP(ssid, password);
   Serial.print("Use 'http://");
   Serial.print(WiFi.softAPIP());
   Serial.println("' to connect");
 #else
+  Serial.print("Connecting to WiFi");
+  // WiFi.mode(WIFI_STA);
+  // WiFi.setTxPower(WIFI_POWER_19_5dBm);
+  // WiFi.setMinSecurity(WIFI_AUTH_WPA_PSK);
   WiFi.begin(ssid, password);
   WiFi.setSleep(false);
 
@@ -167,15 +174,15 @@ void setup() {
   startCameraServer();
 
   // Create a task pinned to core 0
-  xTaskCreatePinnedToCore(
-      taskCore0,   // Function to be called
-      "TaskCore0", // Name of the task
-      10000,       // Stack size (bytes)
-      NULL,        // Parameter to pass
-      2,           // Task priority
-      NULL,        // Task handle
-      0            // Core to run the task on (0 or 1)
-  );
+  // xTaskCreatePinnedToCore(
+  //     taskCore0,   // Function to be called
+  //     "TaskCore0", // Name of the task
+  //     10000,       // Stack size (bytes)
+  //     NULL,        // Parameter to pass
+  //     2,           // Task priority
+  //     NULL,        // Task handle
+  //     0            // Core to run the task on (0 or 1)
+  // );
 
   // setup motor control
   setup_control();
@@ -188,17 +195,25 @@ void setup() {
 
 }
 
+int g_period_ms = 50; // 1000 / 50 = 20 hz
+
+// loopTask Core1, prio=1 
 void loop() {
   TickType_t xLastWakeTime = xTaskGetTickCount();
 
-  // print core id, task name, task priority
-  printf("Core%d: %s (prio=%d)\n",
-    xPortGetCoreID(), 
-    pcTaskGetName(NULL),
-    uxTaskPriorityGet(NULL));
+  if (g_use_dnn) {
+    dnn_loop();
 
-  BaseType_t xWasDelayd = xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000));
-
+    BaseType_t xWasDelayd = xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(g_period_ms));
+  } else {
+    // delay 1s
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    // print core id, task name, task priority
+    printf("Core%d: %s (prio=%d)\n",
+      xPortGetCoreID(), 
+      pcTaskGetName(NULL),
+      uxTaskPriorityGet(NULL));
+  }
 }
 
 #define DEBUG_TFLITE 0
@@ -376,24 +391,10 @@ void dnn_loop()
   fr_dnn = esp_timer_get_time();
 
   int deg = (int)rad2deg(angle);
-  
-  // if (deg < 10 and deg > -10) 
-  // {
-  //   center();
-  //   printf("center (%d) by CPU", deg);
-  // } 
-  // else if (deg >= 10) 
-  // {
-  //   right();
-  //   printf("right (%d) by CPU", deg);
-  // } 
-  // else if (deg <= -10) 
-  // {
-  //   left();
-  //   printf("left (%d) by CPU", deg);
-  // }
+
+  // set steering  
   set_steering(deg);
-  printf("deg=%d (%.3f q=%d)\n", deg, angle, q);
+  // printf("deg=%d (%.3f q=%d)\n", deg, angle, q);
 
   if (fb)
   {
@@ -402,8 +403,10 @@ void dnn_loop()
   }
   int64_t fr_end = esp_timer_get_time();
   int64_t frame_time = (fr_end - last_frame)/1000;
-  if (g_use_dnn) printf("Core%d: %s (prio=%d) %ums (%.1ffps): cap=%dms, pre=%dms, dnn=%dms\n", 
+
+  printf("Core%d: %s (prio=%d) %ums (%.1ffps): deg=%d, cap=%dms, pre=%dms, dnn=%dms\n", 
       xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL), 
+      deg,
       (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time,
       (int)((fr_cap-fr_begin)/1000), (int)((fr_pre-fr_cap)/1000), (int)((fr_dnn-fr_pre)/1000));
 

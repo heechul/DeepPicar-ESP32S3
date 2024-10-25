@@ -297,7 +297,7 @@ while True:
         enable_ondevice_dnn = False
         print ("manual")
     elif ch == ord('m'):
-        n_trials=1000
+        n_trials=100
         print("actuator latency measumenets: {} trials".format(n_trials))
         measure_execution_time(actuator.left, n_trials)
     elif ch == ord('r'):

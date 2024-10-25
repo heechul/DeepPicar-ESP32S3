@@ -158,12 +158,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
 
     while (true)
     {
-        if (g_use_dnn) {
-            // sleep 1000 ms
-            vTaskDelay(pdMS_TO_TICKS(1000));
-        }
-        
-        // TickType_t xLastWakeTime = xTaskGetTickCount();
+        TickType_t xLastWakeTime = xTaskGetTickCount();
 
         fr_pre = esp_timer_get_time();
 
@@ -255,7 +250,11 @@ static esp_err_t stream_handler(httpd_req_t *req)
         last_frame = fr_end;
 
         // sleep 
-        // BaseType_t xWasDelayd = xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000 / 20)); // 10fps
+        // BaseType_t xWasDelayd = pdTRUE;
+        // if (g_use_dnn)
+        //     xWasDelayd = xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000)); // 1fps
+        // else
+        //     xWasDelayd = xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000 / 20)); // 20fps
         // if (xWasDelayd == pdFALSE) {
         //     log_w("Task was blocked for longer than the set period");       
         // }
@@ -317,17 +316,19 @@ static esp_err_t cmd_handler(httpd_req_t *req)
     int res = 0;
 
     if(!strcmp(variable, "auto")) {
-      Serial.println("Autonomous mode");
-      g_use_dnn = 1;
+        Serial.println("Autonomous mode");
+        g_use_dnn = 1;
     } else if(!strcmp(variable, "manual")) {
-      Serial.println("Manual mode");
-      g_use_dnn = 0;
+        Serial.println("Manual mode");
+        g_use_dnn = 0;
     } else if(!strcmp(variable, "throttle_pct")) {
-      Serial.printf("Updated throttle: %d pct\n", val);
-      set_throttle(val);
+        printf("Core%d: %s (prio=%d): updated throttle %d\n",
+            xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL), val);
+        set_throttle(val);
     } else if(!strcmp(variable, "steering_deg")) {
-      Serial.printf("Updated steering: %d deg\n", val);
-      set_steering(val);
+        printf("Core%d: %s (prio=%d): updated steering %d deg\n",
+            xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL), val);
+        set_steering(val);
     } else if (!strcmp(variable, "framesize")) {
         if (s->pixformat == PIXFORMAT_JPEG) {
             res = s->set_framesize(s, (framesize_t)val);

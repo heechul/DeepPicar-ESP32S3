@@ -268,6 +268,8 @@ while True:
         print("frame is None")
         break
   
+    ts_frame = time.time()
+
     # if there's key input, receive the input (must be non blocking)
     ch = inputdev.read_single_event()
     
@@ -322,6 +324,8 @@ while True:
     elif ch == ord('q'):
         break
 
+    ts_input = time.time()
+    # print ("input processing time: %.3f" % (ts_input - ts_frame))
 
     # if AI is enabled, run the DNN model
     if args.dnn == True:
@@ -360,6 +364,9 @@ while True:
         dnn_steering_deg = rad2deg(dnn_angle)
         dnn_throttle_pct = throttle_pct
 
+    ts_dnn = time.time()
+    # print ("DNN processing time: %.3f" % (ts_dnn - ts_input))
+
     # actuate the car immediately if LET is not enabled
     if args.use_LET == False:
        #  args.prob_dnn*100 percent of time choose dnn_angle, while chooing angle for the rest 
@@ -371,11 +378,13 @@ while True:
                 actuator.set_steering(steering_deg)
             if prev_throttle_pct != throttle_pct:
                 actuator.set_throttle(throttle_pct)
+    ts_actuator = time.time()
+    # print ("Actuator processing time: %.3f" % (ts_actuator - ts_dnn))
 
     dur = time.time() - ts
     if dur > period:
-        print("%.3f: took %d ms - deadline miss."
-              % (ts - start_ts, int(dur * 1000)))
+        print("%.3f: took %d ms - deadline miss. frametime: %d ms, actuatortime: %d" % 
+              (ts - start_ts, int(dur * 1000), int((ts-ts_frame)*1000), int((ts_actuator-ts_dnn)*1000)))
     # else:
     #     print("%.3f: took %d ms" % (ts - start_ts, int(dur * 1000)))
     

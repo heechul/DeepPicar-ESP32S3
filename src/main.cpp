@@ -386,7 +386,7 @@ void dnn_loop()
 
   // set steering  
   set_steering(deg);
-  // printf("deg=%d (%.3f q=%d)\n", deg, angle, q);
+  printf("deg=%d (%.3f q=%d)\n", deg, angle, q);
 
   if (fb)
   {
@@ -396,9 +396,8 @@ void dnn_loop()
   int64_t fr_end = esp_timer_get_time();
   int64_t frame_time = (fr_end - last_frame)/1000;
 
-  printf("Core%d: %s (prio=%d) %ums (%.1ffps): deg=%d, cap=%dms, pre=%dms, dnn=%dms\n", 
+  printf("Core%d: %s (prio=%d) %ums (%.1ffps): cap=%dms, pre=%dms, dnn=%dms\n", 
       xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL), 
-      deg,
       (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time,
       (int)((fr_cap-fr_begin)/1000), (int)((fr_pre-fr_cap)/1000), (int)((fr_dnn-fr_pre)/1000));
 

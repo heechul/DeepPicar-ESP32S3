@@ -160,8 +160,10 @@ static esp_err_t stream_handler(httpd_req_t *req)
     {
         fr_pre = esp_timer_get_time();
 
-        if (!g_use_dnn) 
-            fb = esp_camera_fb_get();
+        if (g_use_dnn) // ondevice DNN
+            delay(1000);
+
+        fb = esp_camera_fb_get();
 
         fr_cap = esp_timer_get_time();
 
@@ -322,12 +324,12 @@ static esp_err_t cmd_handler(httpd_req_t *req)
         Serial.println("Manual mode");
         g_use_dnn = 0;
     } else if(!strcmp(variable, "throttle_pct")) {
-        printf("Core%d: %s (prio=%d): updated throttle %d\n",
-            xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL), val);
+        // printf("Core%d: %s (prio=%d): updated throttle %d\n",
+        //     xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL), val);
         set_throttle(val);
     } else if(!strcmp(variable, "steering_deg")) {
-        printf("Core%d: %s (prio=%d): updated steering %d deg\n",
-            xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL), val);
+        // printf("Core%d: %s (prio=%d): updated steering %d deg\n",
+        //     xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL), val);
         set_steering(val);
     } else if (!strcmp(variable, "framesize")) {
         if (s->pixformat == PIXFORMAT_JPEG) {

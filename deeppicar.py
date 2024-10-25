@@ -309,7 +309,7 @@ while True:
             actuator.manual()
         print ("Ondevice DNN:", enable_ondevice_dnn)
     elif ch == ord('m'):
-        n_trials=1000
+        n_trials=100
         print("actuator latency measumenets: {} trials".format(n_trials))
         measure_execution_time(actuator.left, n_trials)
     elif ch == ord('r'):
@@ -367,27 +367,11 @@ while True:
     ts_dnn = time.time()
     # print ("DNN processing time: %.3f" % (ts_dnn - ts_input))
 
-    # actuate the car immediately if LET is not enabled
-    if args.use_LET == False:
-       #  args.prob_dnn*100 percent of time choose dnn_angle, while chooing angle for the rest 
-        if args.dnn == True and np.random.rand() < args.prob_dnn:
-            actuator.set_steering(dnn_steering_deg)
-            actuator.set_throttle(dnn_throttle_pct)
-        else:
-            if prev_steering_deg != steering_deg:
-                actuator.set_steering(steering_deg)
-            if prev_throttle_pct != throttle_pct:
-                actuator.set_throttle(throttle_pct)
-    ts_actuator = time.time()
-    # print ("Actuator processing time: %.3f" % (ts_actuator - ts_dnn))
+    # update previous steering angle and throttle
+    stext = "EXP: %2d - AI: %2d, Thr=%2d" % (steering_deg, dnn_steering_deg, throttle_pct)
+    if prev_steering_deg != steering_deg or prev_throttle_pct != throttle_pct:
+        print (stext)
 
-    dur = time.time() - ts
-    if dur > period:
-        print("%.3f: took %d ms - deadline miss. frametime: %d ms, actuatortime: %d" % 
-              (ts - start_ts, int(dur * 1000), int((ts-ts_frame)*1000), int((ts_actuator-ts_dnn)*1000)))
-    # else:
-    #     print("%.3f: took %d ms" % (ts - start_ts, int(dur * 1000)))
-    
     if view_video == True:
         if args.dnn == True:
             if abs(steering_deg - dnn_steering_deg) < 5:
@@ -435,24 +419,38 @@ while True:
         if frame_id % 10 == 0: 
             print ("%.3f %d %.3f %d(ms)" %(ts, frame_id, steering_deg, int((time.time() - ts)*1000)))
 
-    # update previous steering angle and throttle
-    stext = "EXP: %2d - AI: %2d, Thr=%2d" % (steering_deg, dnn_steering_deg, throttle_pct)
-    if prev_steering_deg != steering_deg or prev_throttle_pct != throttle_pct:
-        print (stext)
+    #  args.prob_dnn*100 percent of time choose dnn_angle, while chooing angle for the rest of the time
+    if args.dnn == True and np.random.rand() < args.prob_dnn:
+        steering_deg = dnn_steering_deg
+        throttle_pct = dnn_throttle_pct
+
+    # actuate the car immediately if LET is not enabled
+    if args.use_LET == False:
+        if prev_steering_deg != steering_deg:
+            actuator.set_steering(steering_deg)
+        if prev_throttle_pct != throttle_pct:
+            actuator.set_throttle(throttle_pct)
+
+    ts_actuator = time.time()
+    # print ("Actuator processing time: %.3f" % (ts_actuator - ts_dnn))
+
+    dur = ts_actuator - ts
+    if dur > period:
+        print("%.3f: took %d ms - deadline miss. frametime: %d ms, actuatortime: %d" % 
+              (ts - start_ts, int(dur * 1000), int((ts-ts_frame)*1000), int((ts_actuator-ts_dnn)*1000)))
+    # else:
+    #     print("%.3f: took %d ms" % (ts - start_ts, int(dur * 1000)))
+    
 
     # wait for the next period
     time.sleep(next(g))
 
-    if args.use_LET == True:
-       #  args.prob_dnn*100 percent of time choose dnn_angle, while chooing angle for the rest 
-        if args.dnn == True and np.random.rand() < args.prob_dnn:
-            actuator.set_steering(dnn_steering_deg)
-            actuator.set_throttle(dnn_throttle_pct)
-        else:
-            if prev_steering_deg != steering_deg:
-                actuator.set_steering(steering_deg)
-            if prev_throttle_pct != throttle_pct:
-                actuator.set_throttle(throttle_pct)
+    # actuate the car when the next period starts if LET is enabled
+    if args.use_LET == True: 
+        if prev_steering_deg != steering_deg:
+            actuator.set_steering(steering_deg)
+        if prev_throttle_pct != throttle_pct:
+            actuator.set_throttle(throttle_pct)
 
     prev_steering_deg = steering_deg
     prev_throttle_pct = throttle_pct

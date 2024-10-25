@@ -199,21 +199,13 @@ int g_period_ms = 50; // 1000 / 50 = 20 hz
 
 // loopTask Core1, prio=1 
 void loop() {
-  TickType_t xLastWakeTime = xTaskGetTickCount();
-
   if (g_use_dnn) {
     dnn_loop();
-
-    BaseType_t xWasDelayd = xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(g_period_ms));
-  } else {
-    // delay 1s
-    vTaskDelay(pdMS_TO_TICKS(1000));
-    // print core id, task name, task priority
-    printf("Core%d: %s (prio=%d)\n",
-      xPortGetCoreID(), 
-      pcTaskGetName(NULL),
-      uxTaskPriorityGet(NULL));
   }
+  // printf("Core%d: %s (prio=%d)\n",
+  //   xPortGetCoreID(), 
+  //   pcTaskGetName(NULL),
+  //   uxTaskPriorityGet(NULL));
 }
 
 #define DEBUG_TFLITE 0

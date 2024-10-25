@@ -158,11 +158,11 @@ static esp_err_t stream_handler(httpd_req_t *req)
 
     while (true)
     {
-        TickType_t xLastWakeTime = xTaskGetTickCount();
-
         fr_pre = esp_timer_get_time();
 
-        fb = esp_camera_fb_get();
+        if (!g_use_dnn) 
+            fb = esp_camera_fb_get();
+
         fr_cap = esp_timer_get_time();
 
         if (!fb)
@@ -258,9 +258,9 @@ static esp_err_t stream_handler(httpd_req_t *req)
         // if (xWasDelayd == pdFALSE) {
         //     log_w("Task was blocked for longer than the set period");       
         // }
-        printf("Core%d: %s (prio=%d): %u ms (%.1ffps): enc: %d ms\n",
-            xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL),
-            (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time, (uint32_t)((fr_enc - fr_cap)/1000));            
+        // printf("Core%d: %s (prio=%d): %u ms (%.1ffps): enc: %d ms\n",
+        //     xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL),
+        //     (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time, (uint32_t)((fr_enc - fr_cap)/1000));            
     }
 
 #if CONFIG_LED_ILLUMINATOR_ENABLED

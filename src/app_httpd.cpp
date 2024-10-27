@@ -278,8 +278,9 @@ static esp_err_t stream_handler(httpd_req_t *req)
     {
         if (g_use_dnn) {
             delay(1000);
-        } else
-            fb = esp_camera_fb_get();
+        }
+         
+        fb = esp_camera_fb_get();
         fr_cap = esp_timer_get_time();
 
         if (!fb)

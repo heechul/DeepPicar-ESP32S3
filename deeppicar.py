@@ -316,8 +316,8 @@ while True:
         enable_record = not enable_record
         print ("record mode: ", enable_record)
     elif ch == ord('t'):
-        print ("toggle video mode")
         view_video = not view_video
+        print ("video mode: ", view_video)
     elif ch == ord('d'):
         args.dnn = not args.dnn
         print ("dnn mode:", args.dnn)

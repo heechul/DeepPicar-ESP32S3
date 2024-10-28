@@ -158,10 +158,9 @@ static esp_err_t stream_handler(httpd_req_t *req)
 
     while (true)
     {
-        fr_pre = esp_timer_get_time();
+        TickType_t xLastWakeTime = xTaskGetTickCount();
 
-        if (g_use_dnn) // ondevice DNN
-            delay(1000);
+        fr_pre = esp_timer_get_time();
 
         fb = esp_camera_fb_get();
 
@@ -252,17 +251,18 @@ static esp_err_t stream_handler(httpd_req_t *req)
         last_frame = fr_end;
 
         // sleep 
-        // BaseType_t xWasDelayd = pdTRUE;
-        // if (g_use_dnn)
-        //     xWasDelayd = xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000)); // 1fps
-        // else
-        //     xWasDelayd = xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000 / 20)); // 20fps
-        // if (xWasDelayd == pdFALSE) {
-        //     log_w("Task was blocked for longer than the set period");       
-        // }
-        // printf("Core%d: %s (prio=%d): %u ms (%.1ffps): enc: %d ms\n",
-        //     xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL),
-        //     (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time, (uint32_t)((fr_enc - fr_cap)/1000));            
+        BaseType_t xWasDelayd = pdTRUE;
+        if (g_use_dnn)
+            xWasDelayd = xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000)); // 1fps
+        else
+            xWasDelayd = xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000 / 20)); // 20fps
+            
+        if (xWasDelayd == pdFALSE) {
+            log_w("Task was blocked for longer than the set period");       
+        }
+        printf("Core%d: %s (prio=%d): %u ms (%.1ffps): enc: %d ms\n",
+            xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL),
+            (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time, (uint32_t)((fr_enc - fr_cap)/1000));            
     }
 
 #if CONFIG_LED_ILLUMINATOR_ENABLED
@@ -383,6 +383,7 @@ void startCameraServer()
 
     ra_filter_init(&ra_filter, 20);
 
+    config.task_priority = tskIDLE_PRIORITY + 5;
     log_i("Starting web server on port: '%d'", config.server_port);
     if (httpd_start(&camera_httpd, &config) == ESP_OK)
     {
@@ -391,6 +392,7 @@ void startCameraServer()
 
     config.server_port += 1;
     config.ctrl_port += 1;
+    config.task_priority = tskIDLE_PRIORITY + 4;
     log_i("Starting stream server on port: '%d'", config.server_port);
     if (httpd_start(&stream_httpd, &config) == ESP_OK)
     {

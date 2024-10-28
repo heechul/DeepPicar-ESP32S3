@@ -23,7 +23,7 @@ NeuralNetwork *g_nn;
 // ===========================
 // Enter your WiFi credentials
 // ===========================
-#define SETUP_AP 1   // 1: setup AP mode, 0: setup Station mode
+#define SETUP_AP 0   // 1: setup AP mode, 0: setup Station mode
 #define WAIT_SERIAL 1 // 1: wait for serial monitor, 0: don't wait
 
 #if SETUP_AP==1
@@ -195,17 +195,25 @@ void setup() {
 
 }
 
-int g_period_ms = 50; // 1000 / 50 = 20 hz
-
-// loopTask Core1, prio=1 
+// loopTask Core1, prio=1 stack=4096
 void loop() {
+  int period = 1000; // 20fps
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+
   if (g_use_dnn) {
     dnn_loop();
+    period = 1000 / 20;
+  } 
+
+  BaseType_t xWasDelayd = xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(period)); // 20fps
+
+  if (xWasDelayd == pdFALSE) {
+    log_w("Task was blocked for longer than the set period");
+    printf("Core%d: %s (prio=%d)\n",
+      xPortGetCoreID(), 
+      pcTaskGetName(NULL),
+      uxTaskPriorityGet(NULL));       
   }
-  // printf("Core%d: %s (prio=%d)\n",
-  //   xPortGetCoreID(), 
-  //   pcTaskGetName(NULL),
-  //   uxTaskPriorityGet(NULL));
 }
 
 #define DEBUG_TFLITE 0

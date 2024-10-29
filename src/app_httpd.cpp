@@ -383,7 +383,7 @@ void startCameraServer()
 
     ra_filter_init(&ra_filter, 20);
 
-    config.task_priority = tskIDLE_PRIORITY + 5;
+    // config.task_priority = tskIDLE_PRIORITY + 5;
     log_i("Starting web server on port: '%d'", config.server_port);
     if (httpd_start(&camera_httpd, &config) == ESP_OK)
     {
@@ -392,7 +392,7 @@ void startCameraServer()
 
     config.server_port += 1;
     config.ctrl_port += 1;
-    config.task_priority = tskIDLE_PRIORITY + 4;
+    config.task_priority = tskIDLE_PRIORITY + 7;
     log_i("Starting stream server on port: '%d'", config.server_port);
     if (httpd_start(&stream_httpd, &config) == ESP_OK)
     {

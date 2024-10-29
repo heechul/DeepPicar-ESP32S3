@@ -23,11 +23,11 @@ NeuralNetwork *g_nn;
 // ===========================
 // Enter your WiFi credentials
 // ===========================
-#define SETUP_AP 0   // 1: setup AP mode, 0: setup Station mode
+#define SETUP_AP 1   // 1: setup AP mode, 0: setup Station mode
 #define WAIT_SERIAL 1 // 1: wait for serial monitor, 0: don't wait
 
 #if SETUP_AP==1
-const char* ssid = "ESP32S3-DR";
+const char* ssid = "ESP32S3";
 const char* password = "123456789"; 
 #else
 const char* ssid = "robocar";
@@ -145,7 +145,7 @@ void setup() {
 
 #if SETUP_AP==1
   Serial.print("Setting AP (Access Point)");
-  WiFi.setTxPower(WIFI_POWER_19_5dBm);
+  // WiFi.setTxPower(WIFI_POWER_19_5dBm);
   WiFi.softAP(ssid, password);
   Serial.print("Use 'http://");
   Serial.print(WiFi.softAPIP());
@@ -153,7 +153,7 @@ void setup() {
 #else
   Serial.print("Connecting to WiFi");
   WiFi.mode(WIFI_STA);
-  WiFi.setTxPower(WIFI_POWER_19_5dBm);
+  // WiFi.setTxPower(WIFI_POWER_19_5dBm);
   // WiFi.setMinSecurity(WIFI_AUTH_WPA_PSK);
   WiFi.begin(ssid, password);
   WiFi.setSleep(false);

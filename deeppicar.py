@@ -285,14 +285,14 @@ while True:
     elif ch == ord('o'):
         steering_deg += 10
     elif ch == ord('a'): # accel
-        throttle_pct += 5
+        throttle_pct = 50
         start_ts = ts
     elif ch == ord('z'): # reverse
-        throttle_pct += -5
-    elif ch == ord('i'): # increase speed to 50%
-        throttle_pct = 50
-    elif ch == ord(','): # decrease speed to -50%
         throttle_pct = -50
+    elif ch == ord('i'): # increase speed 
+        throttle_pct += 5
+    elif ch == ord(','): # decrease speed 
+        throttle_pct += -5
     elif ch == ord('s'): # stop
         throttle_pct = 0 
         actuator.manual()

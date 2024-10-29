@@ -145,7 +145,7 @@ void setup() {
 
 #if SETUP_AP==1
   Serial.print("Setting AP (Access Point)");
-  // WiFi.setTxPower(WIFI_POWER_19_5dBm);
+  WiFi.setTxPower(WIFI_POWER_19_5dBm);
   WiFi.softAP(ssid, password);
   Serial.print("Use 'http://");
   Serial.print(WiFi.softAPIP());

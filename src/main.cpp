@@ -58,6 +58,7 @@ void dnn_loop();
 // }
 
 void setup() {
+  // Serial init
   Serial.begin(115200);
 #if WAIT_SERIAL==1
   while(!Serial) {
@@ -71,6 +72,35 @@ void setup() {
   Serial.setDebugOutput(false);
   Serial.println();
 
+  // WiFi init
+#if SETUP_AP==1
+  Serial.print("Setting AP (Access Point)");
+  WiFi.setTxPower(WIFI_POWER_19_5dBm);
+  WiFi.softAP(ssid, password);
+  Serial.print("Use 'http://");
+  Serial.print(WiFi.softAPIP());
+  Serial.println("' to connect");
+#else
+  Serial.print("Connecting to WiFi");
+  WiFi.mode(WIFI_STA);
+  // WiFi.setTxPower(WIFI_POWER_19_5dBm);
+  // WiFi.setMinSecurity(WIFI_AUTH_WPA_PSK);
+  WiFi.begin(ssid, password);
+  WiFi.setSleep(false);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.print("Use 'http://");
+  Serial.print(WiFi.localIP());
+  Serial.println("' to connect");
+#endif
+  // printf("wifi_task_core_id: %d\n", CONFIG_ESP32_WIFI_TASK_CORE_ID);
+
+  // camera init
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
@@ -123,66 +153,25 @@ void setup() {
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
     Serial.printf("Camera init failed with error 0x%x", err);
-    return;
   } else {
     Serial.println("Camera init success!");
+
+    Serial.printf("Camera info: framesize=%d, pixel_format=%d\n", config.frame_size, config.pixel_format);
+
+    sensor_t * s = esp_camera_sensor_get();
+    // initial sensors are flipped vertically and colors are a bit saturated
+    if (s->id.PID == OV3660_PID) {
+      s->set_vflip(s, 1); // flip it back
+      s->set_brightness(s, 1); // up the brightness just a bit
+      s->set_saturation(s, -2); // lower the saturation
+    }
+
+  // Setup LED FLash if LED pin is defined in camera_pins.h
+  #if defined(LED_GPIO_NUM)
+    setupLedFlash(LED_GPIO_NUM);
+  #endif
+    startCameraServer();
   }
-
-  Serial.printf("Camera info: framesize=%d, pixel_format=%d\n", config.frame_size, config.pixel_format);
-
-  sensor_t * s = esp_camera_sensor_get();
-  // initial sensors are flipped vertically and colors are a bit saturated
-  if (s->id.PID == OV3660_PID) {
-    s->set_vflip(s, 1); // flip it back
-    s->set_brightness(s, 1); // up the brightness just a bit
-    s->set_saturation(s, -2); // lower the saturation
-  }
-
-// Setup LED FLash if LED pin is defined in camera_pins.h
-#if defined(LED_GPIO_NUM)
-  setupLedFlash(LED_GPIO_NUM);
-#endif
-
-#if SETUP_AP==1
-  Serial.print("Setting AP (Access Point)");
-  WiFi.setTxPower(WIFI_POWER_19_5dBm);
-  WiFi.softAP(ssid, password);
-  Serial.print("Use 'http://");
-  Serial.print(WiFi.softAPIP());
-  Serial.println("' to connect");
-#else
-  Serial.print("Connecting to WiFi");
-  WiFi.mode(WIFI_STA);
-  // WiFi.setTxPower(WIFI_POWER_19_5dBm);
-  // WiFi.setMinSecurity(WIFI_AUTH_WPA_PSK);
-  WiFi.begin(ssid, password);
-  WiFi.setSleep(false);
-
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.print("Use 'http://");
-  Serial.print(WiFi.localIP());
-  Serial.println("' to connect");
-#endif
-
-  // printf("wifi_task_core_id: %d\n", CONFIG_ESP32_WIFI_TASK_CORE_ID);
-
-  startCameraServer();
-
-  // Create a task pinned to core 0
-  // xTaskCreatePinnedToCore(
-  //     taskCore0,   // Function to be called
-  //     "TaskCore0", // Name of the task
-  //     10000,       // Stack size (bytes)
-  //     NULL,        // Parameter to pass
-  //     2,           // Task priority
-  //     NULL,        // Task handle
-  //     0            // Core to run the task on (0 or 1)
-  // );
 
   // setup motor control
   setup_control();
@@ -192,12 +181,11 @@ void setup() {
 
   // end of init
   Serial.println("Ready");
-
 }
 
 // loopTask Core1, prio=1 stack=4096
 void loop() {
-  int period = 1000; // 20fps
+  int period = 1000; // 1fps
   TickType_t xLastWakeTime = xTaskGetTickCount();
 
   if (g_use_dnn) {
@@ -209,11 +197,13 @@ void loop() {
 
   if (xWasDelayd == pdFALSE) {
     log_w("Task was blocked for longer than the set period");
-    printf("Core%d: %s (prio=%d)\n",
-      xPortGetCoreID(), 
-      pcTaskGetName(NULL),
-      uxTaskPriorityGet(NULL));       
   }
+
+  printf("Core%d: %s (prio=%d)\n",
+    xPortGetCoreID(), 
+    pcTaskGetName(NULL),
+    uxTaskPriorityGet(NULL));       
+
 }
 
 #define DEBUG_TFLITE 0

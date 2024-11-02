@@ -229,15 +229,15 @@ static esp_err_t stream_handler(httpd_req_t *req)
         {
             res = httpd_resp_send_chunk(req, (const char *)_jpg_buf, _jpg_buf_len);
         }
+        if (_jpg_buf && fb->format != PIXFORMAT_JPEG)
+        {
+            free(_jpg_buf);
+            _jpg_buf = NULL;
+        }
         if (fb)
         {
             esp_camera_fb_return(fb);
             fb = NULL;
-        }
-        if (_jpg_buf)
-        {
-            free(_jpg_buf);
-            _jpg_buf = NULL;
         }
         if (res != ESP_OK)
         {

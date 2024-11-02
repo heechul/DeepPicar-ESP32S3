@@ -169,7 +169,7 @@ parser.add_argument("--turnthresh", help="throttle percent. [0-30]degree", type=
 parser.add_argument("-n", "--ncpu", help="number of cores to use.", type=int, default=2)
 parser.add_argument("-f", "--hz", help="control frequnecy", type=int, default=20)
 parser.add_argument("--fpvvideo", help="Take FPV video of DNN driving", action="store_true")
-parser.add_argument("--use_tensorflow", help="use the full tensorflow instead of tflite", action="store_true")
+parser.add_argument("--use", help="use [tflite|tf|openvino]", type=str, default="tflite")
 parser.add_argument("--pre", help="preprocessing [resize|crop]", type=str, default="resize")
 parser.add_argument("--int8", help="use int8 quantized model", action="store_true", default=True)
 parser.add_argument("--use_LET", help="use LET", action="store_true", default=False)    
@@ -201,10 +201,15 @@ print("use_LET:", args.use_LET)
 ##########################################################
 print ("Loading model: " + params.model_file)
 
-print("use_tensorflow:", args.use_tensorflow)
-if args.use_tensorflow:
+print("use:", args.use)
+if args.use == "tf":
     from tensorflow import keras
     model = keras.models.load_model(params.model_file+'.h5')
+elif args.use == "openvino":
+    import openvino as ov
+    core = ov.Core()
+    ov_model = core.read_model(params.model_file+'.tflite')
+    model = core.compile_model(ov_model, 'AUTO')
 else:
     try:
         # Import TFLite interpreter from tflite_runtime package if it's available.
@@ -344,8 +349,11 @@ while True:
         img = np.concatenate(temporal_context_buffer, axis=3) # (batch, height, weight, channel). 
         # print (img.shape)
         # 2. machine output
-        if args.use_tensorflow:
+        if args.use == "tf":
             dnn_angle = model.predict(img)[0]
+        elif args.use == "openvino":
+            dnn_angle = model(img)[0][0][0]
+            print ('angle:', dnn_angle);
         else: # tflite
             interpreter.set_tensor(input_index, img)
             interpreter.invoke()

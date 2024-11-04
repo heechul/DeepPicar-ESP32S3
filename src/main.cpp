@@ -14,6 +14,9 @@ int g_use_dnn = 0; // set by web server
 // DNN model pointer
 NeuralNetwork *g_nn;
 
+// Camera config
+camera_config_t g_cam_config;
+
 #define CAMERA_MODEL_XIAO_ESP32S3 // Has PSRAM
 
 #include "camera_pins.h"
@@ -101,7 +104,7 @@ void setup() {
   // printf("wifi_task_core_id: %d\n", CONFIG_ESP32_WIFI_TASK_CORE_ID);
 
   // camera init
-  camera_config_t config;
+  camera_config_t &config = g_cam_config;
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
   config.pin_d0 = Y2_GPIO_NUM;

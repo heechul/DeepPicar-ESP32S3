@@ -136,112 +136,68 @@ static esp_err_t stream_handler(httpd_req_t *req)
     char *part_buf[128];
         
     static int64_t last_frame = 0;
-    if (!last_frame)
-    {
+    if (!last_frame) {
         last_frame = esp_timer_get_time();
     }
     int64_t fr_cap, fr_pre, fr_dnn, fr_enc;
 
     res = httpd_resp_set_type(req, _STREAM_CONTENT_TYPE);
-    if (res != ESP_OK)
-    {
+    if (res != ESP_OK) {
         return res;
     }
-
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    httpd_resp_set_hdr(req, "X-Framerate", "10");
-
-#if CONFIG_LED_ILLUMINATOR_ENABLED
-    isStreaming = true;
-    enable_led(true);
-#endif
 
     while (true)
     {
         TickType_t xLastWakeTime = xTaskGetTickCount();
-
         fr_pre = esp_timer_get_time();
 
         fb = esp_camera_fb_get();
-
+        
         fr_cap = esp_timer_get_time();
 
-        if (!fb)
-        {
-            log_e("Camera capture failed");
+        if (!fb) {
+            Serial.println("Camera capture failed");
             res = ESP_FAIL;
-        }
-        else
-        {
+        } else {
             _timestamp.tv_sec = fb->timestamp.tv_sec;
             _timestamp.tv_usec = fb->timestamp.tv_usec;
 
-            if (fb->format != PIXFORMAT_RGB565) {
-                printf("fb->format=%s\n", (fb->format == PIXFORMAT_JPEG) ? "JPEG" : 
-                    (fb->format == PIXFORMAT_GRAYSCALE) ? "GRAYSCALE" : 
-                    (fb->format == PIXFORMAT_RGB888) ? "RGB888" : 
-                    (fb->format == PIXFORMAT_YUV422) ? "YUV422" : "UNKNOWN");
-            }
-
-            // if (g_use_dnn) 
-            // {
-            //     long dur;
-            //     fb_data_t rfb;
-            //     rfb.width = fb->width;
-            //     rfb.height = fb->height;
-            //     rfb.data = fb->buf;
-            //     rfb.bytes_per_pixel = 2;
-            //     rfb.format = FB_RGB565;
-
-            //     fb_gfx_printf(&rfb, 0, 0, COLOR_BLUE, "AI: %3d %s", deg, 
-            //         (deg < 10 and deg > -10) ? "C" : (deg >= 10) ? "R" : "L");
-            // }
-
-            if (fb->format != PIXFORMAT_JPEG)
-            {
+            if (fb->format != PIXFORMAT_JPEG) {
                 bool jpeg_converted = frame2jpg(fb, 80, &_jpg_buf, &_jpg_buf_len);
-
                 esp_camera_fb_return(fb);
                 fb = NULL;
-                if (!jpeg_converted)
-                {
-                    log_e("JPEG compression failed");
+                if (!jpeg_converted) {
+                    Serial.println("JPEG compression failed");
                     res = ESP_FAIL;
                 }
-            }
-            else
-            {
+            } else {
+                Serial.printf("fb: %dx%d, format: %d, len: %d\n", fb->width, fb->height, fb->format, fb->len);
                 _jpg_buf_len = fb->len;
                 _jpg_buf = fb->buf;
             }
             fr_enc = esp_timer_get_time();
         }
-        if (res == ESP_OK)
-        {
+        if (res == ESP_OK) {
             res = httpd_resp_send_chunk(req, _STREAM_BOUNDARY, strlen(_STREAM_BOUNDARY));
         }
-        if (res == ESP_OK)
-        {
+        if (res == ESP_OK) {
             size_t hlen = snprintf((char *)part_buf, 128, _STREAM_PART, _jpg_buf_len, _timestamp.tv_sec, _timestamp.tv_usec);
             res = httpd_resp_send_chunk(req, (const char *)part_buf, hlen);
         }
-        if (res == ESP_OK)
-        {
+        if (res == ESP_OK) {
             res = httpd_resp_send_chunk(req, (const char *)_jpg_buf, _jpg_buf_len);
-        }
-        if (_jpg_buf && fb->format != PIXFORMAT_JPEG)
-        {
+        }        
+        if (fb) {
+            Serial.printf("Free heap: %u\n", xPortGetFreeHeapSize());
+            esp_camera_fb_return(fb);
+            fb = NULL;
+            _jpg_buf = NULL;
+        } else if (_jpg_buf) {
             free(_jpg_buf);
             _jpg_buf = NULL;
         }
-        if (fb)
-        {
-            esp_camera_fb_return(fb);
-            fb = NULL;
-        }
-        if (res != ESP_OK)
-        {
-            log_e("Send frame failed");
+        if (res != ESP_OK) {
+            Serial.println("Send frame failed");
             break;
         }
         int64_t fr_end = esp_timer_get_time();
@@ -264,12 +220,6 @@ static esp_err_t stream_handler(httpd_req_t *req)
             xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL),
             (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time, (uint32_t)((fr_enc - fr_cap)/1000));            
     }
-
-#if CONFIG_LED_ILLUMINATOR_ENABLED
-    isStreaming = false;
-    enable_led(false);
-#endif
-
     return res;
 }
 

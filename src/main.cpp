@@ -14,9 +14,6 @@ int g_use_dnn = 0; // set by web server
 // DNN model pointer
 NeuralNetwork *g_nn;
 
-// Camera config
-camera_config_t g_cam_config;
-
 #define CAMERA_MODEL_XIAO_ESP32S3 // Has PSRAM
 
 #include "camera_pins.h"
@@ -104,7 +101,7 @@ void setup() {
   // printf("wifi_task_core_id: %d\n", CONFIG_ESP32_WIFI_TASK_CORE_ID);
 
   // camera init
-  camera_config_t &config = g_cam_config;
+  camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
   config.pin_d0 = Y2_GPIO_NUM;
@@ -125,7 +122,7 @@ void setup() {
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
   config.frame_size = FRAMESIZE_QQVGA;
-#if 1
+#if 0
   config.pixel_format = PIXFORMAT_JPEG; // for streaming
 #else
   config.pixel_format = PIXFORMAT_RGB565; // for face detection/recognition
@@ -134,26 +131,6 @@ void setup() {
   config.fb_location = CAMERA_FB_IN_PSRAM;
   config.jpeg_quality = 12;
   config.fb_count = 3;
-  
-  // if PSRAM IC present, init with UXGA resolution and higher JPEG quality
-  //                      for larger pre-allocated frame buffer.
-//   if(config.pixel_format == PIXFORMAT_JPEG){
-//     if(psramFound()){
-//       config.jpeg_quality = 10;
-//       config.fb_count = 2;
-//       config.grab_mode = CAMERA_GRAB_LATEST;
-//     } else {
-//       // Limit the frame size when PSRAM is not available
-//       config.frame_size = FRAMESIZE_SVGA;
-//       config.fb_location = CAMERA_FB_IN_DRAM;
-//     }
-//   } else {
-//     // Best option for face detection/recognition
-//     config.frame_size = FRAMESIZE_QQVGA;
-// #if CONFIG_IDF_TARGET_ESP32S3
-//     config.fb_count = 3;
-// #endif
-//   }
 
   // camera init
   esp_err_t err = esp_camera_init(&config);
@@ -161,21 +138,7 @@ void setup() {
     Serial.printf("Camera init failed with error 0x%x", err);
   } else {
     Serial.println("Camera init success!");
-
     Serial.printf("Camera info: framesize=%d, pixel_format=%d\n", config.frame_size, config.pixel_format);
-
-    sensor_t * s = esp_camera_sensor_get();
-    // initial sensors are flipped vertically and colors are a bit saturated
-    if (s->id.PID == OV3660_PID) {
-      s->set_vflip(s, 1); // flip it back
-      s->set_brightness(s, 1); // up the brightness just a bit
-      s->set_saturation(s, -2); // lower the saturation
-    }
-
-  // Setup LED FLash if LED pin is defined in camera_pins.h
-  #if defined(LED_GPIO_NUM)
-    setupLedFlash(LED_GPIO_NUM);
-  #endif
     startCameraServer();
   }
 

@@ -30,6 +30,7 @@ def init(res=(160, 120), fps=30, threading=True):
     elif res == (160, 120): cam_res = 1
     elif res == (176, 144): cam_res = 2
     elif res == (320, 240): cam_res = 3
+    elif res == (640, 480): cam_res = 5
     else:
         print ("Camera resolution not supported.")
         return

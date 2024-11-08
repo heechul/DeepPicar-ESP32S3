@@ -20,28 +20,9 @@
 #include "esp32-hal-ledc.h"
 #include "sdkconfig.h"
 
-#if defined(ARDUINO_ARCH_ESP32) && defined(CONFIG_ARDUHAL_ESP_LOG)
-#include "esp32-hal-log.h"
-#endif
-
 #define COLOR_GREEN 0x0000FF00
 #define COLOR_RED 0x00FF0000
 #define COLOR_BLUE 0x000000FF
-
-// Enable LED FLASH setting
-#define CONFIG_LED_ILLUMINATOR_ENABLED 1
-
-// LED FLASH setup
-#if CONFIG_LED_ILLUMINATOR_ENABLED
-
-#define LED_LEDC_CHANNEL 2 //Using different ledc channel/timer than camera
-#define CONFIG_LED_MAX_INTENSITY 255
-
-int led_duty = 0;
-bool isStreaming = false;
-
-#endif
-
 
 typedef struct
 {
@@ -55,68 +36,7 @@ static const char *_STREAM_BOUNDARY = "\r\n--" PART_BOUNDARY "\r\n";
 static const char *_STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %u\r\nX-Timestamp: %d.%06d\r\n\r\n";
 
 httpd_handle_t stream_httpd = NULL;
-httpd_handle_t camera_httpd = NULL;
-
-typedef struct
-{
-    size_t size;  //number of values used for filtering
-    size_t index; //current value index
-    size_t count; //value count
-    int sum;
-    int *values; //array to be filled with values
-} ra_filter_t;
-
-static ra_filter_t ra_filter;
-
-static ra_filter_t *ra_filter_init(ra_filter_t *filter, size_t sample_size)
-{
-    memset(filter, 0, sizeof(ra_filter_t));
-
-    filter->values = (int *)malloc(sample_size * sizeof(int));
-    if (!filter->values)
-    {
-        return NULL;
-    }
-    memset(filter->values, 0, sample_size * sizeof(int));
-
-    filter->size = sample_size;
-    return filter;
-}
-
-#if ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_INFO
-static int ra_filter_run(ra_filter_t *filter, int value)
-{
-    if (!filter->values)
-    {
-        return value;
-    }
-    filter->sum -= filter->values[filter->index];
-    filter->values[filter->index] = value;
-    filter->sum += filter->values[filter->index];
-    filter->index++;
-    filter->index = filter->index % filter->size;
-    if (filter->count < filter->size)
-    {
-        filter->count++;
-    }
-    return filter->sum / filter->count;
-}
-#endif
-
-#if CONFIG_LED_ILLUMINATOR_ENABLED
-void enable_led(bool en)
-{ // Turn LED On or Off
-    int duty = en ? led_duty : 0;
-    if (en && isStreaming && (led_duty > CONFIG_LED_MAX_INTENSITY))
-    {
-        duty = CONFIG_LED_MAX_INTENSITY;
-    }
-    ledcWrite(LED_LEDC_CHANNEL, duty);
-    //ledc_set_duty(CONFIG_LED_LEDC_SPEED_MODE, CONFIG_LED_LEDC_CHANNEL, duty);
-    //ledc_update_duty(CONFIG_LED_LEDC_SPEED_MODE, CONFIG_LED_LEDC_CHANNEL);
-    log_i("Set LED intensity to %d", duty);
-}
-#endif
+httpd_handle_t cmd_httpd = NULL;
 
 #include <Arduino.h>
 
@@ -133,13 +53,18 @@ static esp_err_t stream_handler(httpd_req_t *req)
     esp_err_t res = ESP_OK;
     size_t _jpg_buf_len = 0;
     uint8_t *_jpg_buf = NULL;
-    char *part_buf[128];
+    char part_buf[128];
         
     static int64_t last_frame = 0;
     if (!last_frame) {
         last_frame = esp_timer_get_time();
     }
     int64_t fr_cap, fr_pre, fr_dnn, fr_enc;
+
+    sensor_t *s = esp_camera_sensor_get();
+    if (s->status.framesize > 0) {
+        Serial.printf("Camera info: framesize=%d, pixel_format=%d\n", s->status.framesize, s->pixformat);
+    }
 
     res = httpd_resp_set_type(req, _STREAM_CONTENT_TYPE);
     if (res != ESP_OK) {
@@ -161,6 +86,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
         } else {
             _timestamp.tv_sec = fb->timestamp.tv_sec;
             _timestamp.tv_usec = fb->timestamp.tv_usec;
+            Serial.printf("fb: %dx%d, format: %d, len: %d\n", fb->width, fb->height, fb->format, fb->len);
 
             if (fb->format != PIXFORMAT_JPEG) {
                 bool jpeg_converted = frame2jpg(fb, 80, &_jpg_buf, &_jpg_buf_len);
@@ -171,7 +97,6 @@ static esp_err_t stream_handler(httpd_req_t *req)
                     res = ESP_FAIL;
                 }
             } else {
-                Serial.printf("fb: %dx%d, format: %d, len: %d\n", fb->width, fb->height, fb->format, fb->len);
                 _jpg_buf_len = fb->len;
                 _jpg_buf = fb->buf;
             }
@@ -188,7 +113,6 @@ static esp_err_t stream_handler(httpd_req_t *req)
             res = httpd_resp_send_chunk(req, (const char *)_jpg_buf, _jpg_buf_len);
         }        
         if (fb) {
-            Serial.printf("Free heap: %u\n", xPortGetFreeHeapSize());
             esp_camera_fb_return(fb);
             fb = NULL;
             _jpg_buf = NULL;
@@ -223,56 +147,42 @@ static esp_err_t stream_handler(httpd_req_t *req)
     return res;
 }
 
-static esp_err_t parse_get(httpd_req_t *req, char **obuf)
-{
-    char *buf = NULL;
-    size_t buf_len = 0;
-
-    buf_len = httpd_req_get_url_query_len(req) + 1;
-    if (buf_len > 1) {
-        buf = (char *)malloc(buf_len);
-        if (!buf) {
-            httpd_resp_send_500(req);
-            return ESP_FAIL;
-        }
-        if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK) {
-            *obuf = buf;
-            return ESP_OK;
-        }
-        free(buf);
-    }
-    httpd_resp_send_404(req);
-    return ESP_FAIL;
-}
-
 static esp_err_t cmd_handler(httpd_req_t *req)
 {
     char *buf = NULL;
+    size_t buf_len = 0;
     char variable[32];
     char value[32];
 
-    if (parse_get(req, &buf) != ESP_OK) {
-        return ESP_FAIL;
-    }
-    if (httpd_query_key_value(buf, "var", variable, sizeof(variable)) != ESP_OK ||
-        httpd_query_key_value(buf, "val", value, sizeof(value)) != ESP_OK) {
+    buf_len = httpd_req_get_url_query_len(req) + 1;
+    if (buf_len > 1) {
+        buf = (char*)malloc(buf_len);
+        if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK) {
+            if (httpd_query_key_value(buf, "var", variable, sizeof(variable)) == ESP_OK &&
+                httpd_query_key_value(buf, "val", value, sizeof(value)) == ESP_OK) {
+            }
+            Serial.printf("Found URL query parameter => var=%s, val=%s\n", variable, value);
+        }
         free(buf);
-        httpd_resp_send_404(req);
-        return ESP_FAIL;
     }
-    free(buf);
 
     int val = atoi(value);
-    log_i("%s = %d", variable, val);
-    sensor_t *s = esp_camera_sensor_get();
     int res = 0;
 
     if(!strcmp(variable, "auto")) {
         Serial.println("Autonomous mode");
         g_use_dnn = 1;
+        sensor_t *s = esp_camera_sensor_get();
+        if (s->pixformat != PIXFORMAT_RGB565) {
+            s->set_pixformat(s, PIXFORMAT_RGB565);
+        }
     } else if(!strcmp(variable, "manual")) {
         Serial.println("Manual mode");
         g_use_dnn = 0;
+        sensor_t *s = esp_camera_sensor_get();
+        if (s->pixformat != PIXFORMAT_JPEG) {
+            s->set_pixformat(s, PIXFORMAT_JPEG);
+        }
     } else if(!strcmp(variable, "throttle_pct")) {
         // printf("Core%d: %s (prio=%d): updated throttle %d\n",
         //     xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL), val);
@@ -282,9 +192,9 @@ static esp_err_t cmd_handler(httpd_req_t *req)
         //     xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL), val);
         set_steering(val);
     } else if (!strcmp(variable, "framesize")) {
-        if (s->pixformat == PIXFORMAT_JPEG) {
-            res = s->set_framesize(s, (framesize_t)val);
-        }
+        sensor_t *s = esp_camera_sensor_get();
+        res = s->set_framesize(s, (framesize_t)val);
+        printf("Camera info: framesize=%d, pixel_format=%d\n", s->status.framesize, s->pixformat);
     } else {
         log_i("Unknown command: %s", variable);
         res = -1;
@@ -300,53 +210,38 @@ static esp_err_t cmd_handler(httpd_req_t *req)
 
 void startCameraServer()
 {
-    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 16;
+  httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+  config.server_port = 80;
 
-    httpd_uri_t cmd_uri = {
-        .uri = "/control",
-        .method = HTTP_GET,
-        .handler = cmd_handler,
-        .user_ctx = NULL
-#ifdef CONFIG_HTTPD_WS_SUPPORT
-        ,
-        .is_websocket = true,
-        .handle_ws_control_frames = false,
-        .supported_subprotocol = NULL
-#endif
-    };
+  httpd_uri_t cmd_uri = {
+    .uri = "/control",
+    .method = HTTP_GET,
+    .handler = cmd_handler,
+    .user_ctx = NULL,
+    .is_websocket = true,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL
+  };
 
+  httpd_uri_t stream_uri = {
+    .uri       = "/stream",
+    .method    = HTTP_GET,
+    .handler   = stream_handler,
+    .user_ctx  = NULL,
+    .is_websocket = true,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL
+  };
 
-    httpd_uri_t stream_uri = {
-        .uri = "/stream",
-        .method = HTTP_GET,
-        .handler = stream_handler,
-        .user_ctx = NULL
-#ifdef CONFIG_HTTPD_WS_SUPPORT
-        ,
-        .is_websocket = true,
-        .handle_ws_control_frames = false,
-        .supported_subprotocol = NULL
-#endif
-    };
-
-
-    ra_filter_init(&ra_filter, 20);
-
-    config.task_priority = tskIDLE_PRIORITY + 7;
-    log_i("Starting web server on port: '%d'", config.server_port);
-    if (httpd_start(&camera_httpd, &config) == ESP_OK)
-    {
-        httpd_register_uri_handler(camera_httpd, &cmd_uri);
-    }
-
-    config.server_port += 1;
-    config.ctrl_port += 1;
-    config.task_priority = tskIDLE_PRIORITY + 5;
-    log_i("Starting stream server on port: '%d'", config.server_port);
-    if (httpd_start(&stream_httpd, &config) == ESP_OK)
-    {
-        httpd_register_uri_handler(stream_httpd, &stream_uri);
-    }
+  Serial.printf("Starting control server on port: '%d'\n", config.server_port);
+  if (httpd_start(&cmd_httpd, &config) == ESP_OK) {
+    httpd_register_uri_handler(cmd_httpd, &cmd_uri);
+  }  
+  config.server_port += 1;  // 81
+  config.ctrl_port += 1;    // 32769
+  Serial.printf("Starting stream server on port: '%d'\n", config.server_port);
+  if (httpd_start(&stream_httpd, &config) == ESP_OK) {
+    httpd_register_uri_handler(stream_httpd, &stream_uri);
+  }
 }
 

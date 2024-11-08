@@ -8,21 +8,9 @@
 #include <WiFi.h>
 #include "NeuralNetwork.h"
 
-// enable deeppicar dnn by default
-int g_use_dnn = 0; // set by web server
-
-// DNN model pointer
-NeuralNetwork *g_nn;
-
-#define CAMERA_MODEL_XIAO_ESP32S3 // Has PSRAM
-
 #include "camera_pins.h"
-
 #include "control.h" // motor control
 
-// ===========================
-// Enter your WiFi credentials
-// ===========================
 #define SETUP_AP 1   // 1: setup AP mode, 0: setup Station mode
 #define WAIT_SERIAL 1 // 1: wait for serial monitor, 0: don't wait
 
@@ -34,28 +22,14 @@ const char* ssid = "robocar";
 const char* password = "robocar1234";
 #endif
 
+// enable deeppicar dnn by default
+int g_use_dnn = 0; // set by web server
+
+// DNN model pointer
+NeuralNetwork *g_nn;
+
 void startCameraServer();
-void setupLedFlash(int pin);
 void dnn_loop();
-
-// Function to be run on core 0
-// void taskCore0(void *pvParameters) {
-//   while (true) {
-//     TickType_t xLastWakeTime = xTaskGetTickCount();
-
-//     if (g_use_dnn) {
-//       dnn_loop();
-//     }
-
-//     BaseType_t xWasDelayd = xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000 / 20)); // 20fps
-//     if (xWasDelayd == pdFALSE) {
-//         log_w("Task was blocked for longer than the set period");       
-//     }
-
-//     // printf("Core%d: %s (prio=%d, delayed=%d)\n", 
-//     //   xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL), xWasDelayd);
-//   }
-// }
 
 void setup() {
   // Serial init
@@ -121,26 +95,26 @@ void setup() {
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
-  config.frame_size = FRAMESIZE_QQVGA;
-#if 0
+  config.frame_size = FRAMESIZE_QVGA;
+  // config.pixel_format = PIXFORMAT_RGB565;
   config.pixel_format = PIXFORMAT_JPEG; // for streaming
-#else
-  config.pixel_format = PIXFORMAT_RGB565; // for face detection/recognition
-#endif
-  config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
+  config.grab_mode = CAMERA_GRAB_LATEST;
   config.fb_location = CAMERA_FB_IN_PSRAM;
   config.jpeg_quality = 12;
-  config.fb_count = 3;
+  config.fb_count = 2;
 
   // camera init
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
     Serial.printf("Camera init failed with error 0x%x", err);
-  } else {
-    Serial.println("Camera init success!");
-    Serial.printf("Camera info: framesize=%d, pixel_format=%d\n", config.frame_size, config.pixel_format);
-    startCameraServer();
-  }
+    return;
+  } 
+
+  Serial.println("Camera init success!");
+  Serial.printf("Camera info: framesize=%d, pixel_format=%d\n", config.frame_size, config.pixel_format);
+  
+  // start stream and command http servers
+  startCameraServer();
 
   // setup motor control
   setup_control();
@@ -154,25 +128,14 @@ void setup() {
 
 // loopTask Core1, prio=1 stack=4096
 void loop() {
-  int period = 1000; // 1fps
-  TickType_t xLastWakeTime = xTaskGetTickCount();
-
   if (g_use_dnn) {
+    // dnn control
     dnn_loop();
-    period = 1000 / 20;
-  } 
-
-  BaseType_t xWasDelayd = xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(period)); // 20fps
-
-  if (xWasDelayd == pdFALSE) {
-    log_w("Task was blocked for longer than the set period");
+  } else {
+    // manual control
+    delay(1000);
+    Serial.print(".");
   }
-
-  printf("Core%d: %s (prio=%d)\n",
-    xPortGetCoreID(), 
-    pcTaskGetName(NULL),
-    uxTaskPriorityGet(NULL));       
-
 }
 
 #define DEBUG_TFLITE 0

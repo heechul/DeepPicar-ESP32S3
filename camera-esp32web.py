@@ -14,7 +14,6 @@ frame = None
 
 def init(res=(160, 120), fps=30, threading=True):
     global cap, use_thread, frame, cam_thr
-    cam_res = 1
     cap = cv2.VideoCapture(URL + ":81/stream")
 
     # Set buffer size to 1
@@ -24,18 +23,14 @@ def init(res=(160, 120), fps=30, threading=True):
         print ("Cannot open camera.")
         return    
 
-    # 0 - 96x96, 1 - 160x120, 2 - 176x144, 3 - 320x240, 4 - 352x288, 
-    # 5 - 640x480, 6 - 800x600, 7 - 1024x768, 8 - 1280x1024, 9 - 1600x1200
+    # set camera resolution
+    cam_res = -1
     if res == (96, 96): cam_res = 0
     elif res == (160, 120): cam_res = 1
-    elif res == (176, 144): cam_res = 2
-    elif res == (320, 240): cam_res = 3
-    elif res == (640, 480): cam_res = 5
-    else:
-        print ("Camera resolution not supported.")
-        return
-
-    requests.get(URL + "/control?var=framesize&val={}".format(cam_res)) 
+    elif res == (320, 240): cam_res = 5
+    elif res == (640, 480): cam_res = 8
+    if cam_res >= 0:
+        requests.get(URL + "/control?var=framesize&val={}".format(cam_res)) 
     
     # start the camera thread
     if threading:

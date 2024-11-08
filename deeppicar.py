@@ -24,7 +24,7 @@ inputdev = __import__(params.inputdev)
 use_thread = True
 view_video = False
 enable_record = False
-cfg_cam_res = (160, 120)
+cfg_cam_res = (320, 240)
 cfg_cam_fps = 30
 enable_ondevice_dnn = False
 frame_id = 0
@@ -210,21 +210,23 @@ elif args.use == "openvino":
     core = ov.Core()
     ov_model = core.read_model(params.model_file+'.tflite')
     model = core.compile_model(ov_model, 'AUTO')
-else:
+elif args.use == "tflite":
     try:
         # Import TFLite interpreter from tflite_runtime package if it's available.
         from tflite_runtime.interpreter import Interpreter
         interpreter = Interpreter(params.model_file+'.tflite', num_threads=args.ncpu)
     except ImportError:
+        print("failed to load tflite_runtime")
         # Import TFLMicro interpreter
         try:
             from tflite_micro_runtime.interpreter import Interpreter 
             interpreter = Interpreter(params.model_file+'.tflite')
         except:
+            print("failed to load tflite_micro_runtime")
             # If all failed, fallback to use the TFLite interpreter from the full TF package.
             import tensorflow as tf
             interpreter = tf.lite.Interpreter(model_path=params.model_file+'.tflite', num_threads=args.ncpu)
-
+            print("using tf.lite.Interpreter")
     interpreter.allocate_tensors()
     input_index = interpreter.get_input_details()[0]["index"]
     output_index = interpreter.get_output_details()[0]["index"]
@@ -236,6 +238,8 @@ else:
     quantization = interpreter.get_output_details()[0]['quantization']
     (scale, zerop) = quantization
     print('  zerop: ', zerop, 'scale: ', scale)
+else:
+    print("no model is loaded")
 
 # initlaize deeppicar modules
 print ("Initialize the camera")

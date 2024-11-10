@@ -433,15 +433,18 @@ while True:
 
     #  args.prob_dnn*100 percent of time choose dnn_angle, while chooing angle for the rest of the time
     if args.dnn == True and np.random.rand() < args.prob_dnn:
-        steering_deg = dnn_steering_deg
-        throttle_pct = dnn_throttle_pct
+        deg = dnn_steering_deg
+        pct = dnn_throttle_pct
+    else:
+        deg = steering_deg
+        pct = throttle_pct
 
     # actuate the car immediately if LET is not enabled
     if args.use_LET == False:
-        if prev_steering_deg != steering_deg:
-            actuator.set_steering(steering_deg)
-        if prev_throttle_pct != throttle_pct:
-            actuator.set_throttle(throttle_pct)
+        if prev_steering_deg != deg:
+            actuator.set_steering(deg)
+        if prev_throttle_pct != pct:
+            actuator.set_throttle(pct)
 
     ts_actuator = time.time()
     # print ("Actuator processing time: %.3f" % (ts_actuator - ts_dnn))
@@ -449,7 +452,7 @@ while True:
     dur = ts_actuator - ts
     if dur > period:
         print("%.3f: took %d ms - deadline miss. frametime: %d ms, actuatortime: %d" % 
-              (ts - start_ts, int(dur * 1000), int((ts-ts_frame)*1000), int((ts_actuator-ts_dnn)*1000)))
+              (ts - start_ts, int(dur * 1000), int((ts_frame - ts)*1000), int((ts_actuator - ts_dnn)*1000)))
     # else:
     #     print("%.3f: took %d ms" % (ts - start_ts, int(dur * 1000)))
     
@@ -459,10 +462,10 @@ while True:
 
     # actuate the car when the next period starts if LET is enabled
     if args.use_LET == True: 
-        if prev_steering_deg != steering_deg:
-            actuator.set_steering(steering_deg)
-        if prev_throttle_pct != throttle_pct:
-            actuator.set_throttle(throttle_pct)
+        if prev_steering_deg != deg:
+            actuator.set_steering(deg)
+        if prev_throttle_pct != pct:
+            actuator.set_throttle(pct)
 
     prev_steering_deg = steering_deg
     prev_throttle_pct = throttle_pct

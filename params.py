@@ -4,6 +4,8 @@
 #   "camera-esp32web" "camera-null"
 ##########################################################
 URL="http://192.168.4.1"
+# URL="http://192.168.2.109"
+# URL="http://192.168.1.194"
 camera="camera-esp32web"
 # camera="camera-null"
 
@@ -27,12 +29,13 @@ img_width = 160
 img_height = 60
 img_channels = 3
 temporal_context = 1
+ch_frac = 1.0
 ##########################################################
 # model selection
 #   "model_large"   <-- nvidia dave-2 model
 ##########################################################
-model_name = "opt-k2"
-model_file = "models/{}-{}x{}x{}-T{}".format(model_name, img_width, img_height, img_channels, temporal_context)
+model_name = "pilotnet-dg"
+model_file = "models/{}-{}x{}x{}-T{}-r{}".format(model_name, img_width, img_height, img_channels, temporal_context, ch_frac)
 
 ##########################################################
 # recording config 

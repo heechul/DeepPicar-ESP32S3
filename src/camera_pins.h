@@ -1,4 +1,5 @@
 
+#define CAMERA_MODEL_XIAO_ESP32S3 1 // Has PSRAM
 
 #if defined(CAMERA_MODEL_XIAO_ESP32S3)
 #define PWDN_GPIO_NUM     -1

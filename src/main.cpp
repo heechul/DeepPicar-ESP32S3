@@ -1,6 +1,26 @@
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_timer.h"
+#include "esp_system.h"
+#include <stdio.h>
+
 #include "esp_camera.h"
 #include <WiFi.h>
 #include "NeuralNetwork.h"
+
+#include "camera_pins.h"
+#include "control.h" // motor control
+
+#define SETUP_AP 1   // 1: setup AP mode, 0: setup Station mode
+#define WAIT_SERIAL 1 // 1: wait for serial monitor, 0: don't wait
+
+#if SETUP_AP==1
+const char* ssid = "ESP32S3";
+const char* password = "123456789"; 
+#else
+const char* ssid = "robocar";
+const char* password = "robocar1234";
+#endif
 
 // enable deeppicar dnn by default
 int g_use_dnn = 0; // set by web server
@@ -8,32 +28,11 @@ int g_use_dnn = 0; // set by web server
 // DNN model pointer
 NeuralNetwork *g_nn;
 
-#define CAMERA_MODEL_XIAO_ESP32S3 // Has PSRAM
-
-#include "camera_pins.h"
-
-#include "control.h" // motor control
-
-// ===========================
-// Enter your WiFi credentials
-// ===========================
-#define SETUP_AP 1 // 1: setup AP mode, 0: setup Station mode
-#define WAIT_SERIAL 1 // 1: wait for serial monitor, 0: don't wait
-
-#if SETUP_AP==1
-const char* ssid = "ESP32S3-DR";
-const char* password = "123456789"; 
-#else
-const char* ssid = "";
-const char* password = "";
-#endif
-
 void startCameraServer();
-void setupLedFlash(int pin);
-
+void dnn_loop();
 
 void setup() {
-
+  // Serial init
   Serial.begin(115200);
 #if WAIT_SERIAL==1
   while(!Serial) {
@@ -47,6 +46,35 @@ void setup() {
   Serial.setDebugOutput(false);
   Serial.println();
 
+  // WiFi init
+#if SETUP_AP==1
+  Serial.print("Setting AP (Access Point)");
+  WiFi.setTxPower(WIFI_POWER_19_5dBm);
+  WiFi.softAP(ssid, password);
+  Serial.print("Use 'http://");
+  Serial.print(WiFi.softAPIP());
+  Serial.println("' to connect");
+#else
+  Serial.print("Connecting to WiFi");
+  WiFi.mode(WIFI_STA);
+  // WiFi.setTxPower(WIFI_POWER_19_5dBm);
+  // WiFi.setMinSecurity(WIFI_AUTH_WPA_PSK);
+  WiFi.begin(ssid, password);
+  WiFi.setSleep(false);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.print("Use 'http://");
+  Serial.print(WiFi.localIP());
+  Serial.println("' to connect");
+#endif
+  // printf("wifi_task_core_id: %d\n", CONFIG_ESP32_WIFI_TASK_CORE_ID);
+
+  // camera init
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
@@ -67,79 +95,25 @@ void setup() {
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
-  config.frame_size = FRAMESIZE_QQVGA;
-  // config.pixel_format = PIXFORMAT_JPEG; // for streaming
-  config.pixel_format = PIXFORMAT_RGB565; // for face detection/recognition
-  config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
+  config.frame_size = FRAMESIZE_QVGA;
+  // config.pixel_format = PIXFORMAT_RGB565;
+  config.pixel_format = PIXFORMAT_JPEG; // for streaming
+  config.grab_mode = CAMERA_GRAB_LATEST;
   config.fb_location = CAMERA_FB_IN_PSRAM;
   config.jpeg_quality = 12;
-  config.fb_count = 1;
-  
-  // if PSRAM IC present, init with UXGA resolution and higher JPEG quality
-  //                      for larger pre-allocated frame buffer.
-  if(config.pixel_format == PIXFORMAT_JPEG){
-    if(psramFound()){
-      config.jpeg_quality = 10;
-      config.fb_count = 2;
-      config.grab_mode = CAMERA_GRAB_LATEST;
-    } else {
-      // Limit the frame size when PSRAM is not available
-      config.frame_size = FRAMESIZE_SVGA;
-      config.fb_location = CAMERA_FB_IN_DRAM;
-    }
-  } else {
-    // Best option for face detection/recognition
-    config.frame_size = FRAMESIZE_QQVGA;
-#if CONFIG_IDF_TARGET_ESP32S3
-    config.fb_count = 3;
-#endif
-  }
+  config.fb_count = 2;
 
   // camera init
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
     Serial.printf("Camera init failed with error 0x%x", err);
     return;
-  } else {
-    Serial.println("Camera init success!");
-  }
+  } 
 
+  Serial.println("Camera init success!");
   Serial.printf("Camera info: framesize=%d, pixel_format=%d\n", config.frame_size, config.pixel_format);
-
-  sensor_t * s = esp_camera_sensor_get();
-  // initial sensors are flipped vertically and colors are a bit saturated
-  if (s->id.PID == OV3660_PID) {
-    s->set_vflip(s, 1); // flip it back
-    s->set_brightness(s, 1); // up the brightness just a bit
-    s->set_saturation(s, -2); // lower the saturation
-  }
-
-// Setup LED FLash if LED pin is defined in camera_pins.h
-#if defined(LED_GPIO_NUM)
-  setupLedFlash(LED_GPIO_NUM);
-#endif
-
-#if SETUP_AP==1
-  Serial.print("Setting AP (Access Point)…");
-  WiFi.softAP(ssid, password);
-  Serial.print("Use 'http://");
-  Serial.print(WiFi.softAPIP());
-  Serial.println("' to connect");
-#else
-  WiFi.begin(ssid, password);
-  WiFi.setSleep(false);
-
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.print("Use 'http://");
-  Serial.print(WiFi.localIP());
-  Serial.println("' to connect");
-#endif
-
+  
+  // start stream and command http servers
   startCameraServer();
 
   // setup motor control
@@ -148,6 +122,20 @@ void setup() {
   // register pilotnet algo
   g_nn = new NeuralNetwork();
 
+  // end of init
+  Serial.println("Ready");
+}
+
+// loopTask Core1, prio=1 stack=4096
+void loop() {
+  if (g_use_dnn) {
+    // dnn control
+    dnn_loop();
+  } else {
+    // manual control
+    delay(1000);
+    Serial.print(".");
+  }
 }
 
 #define DEBUG_TFLITE 0
@@ -280,17 +268,11 @@ int GetAction(float rad)
     return -1;
 }
 
-void loop() {
-
+void dnn_loop()
+{
   camera_fb_t *fb = NULL;
   int64_t fr_begin, fr_cap, fr_pre, fr_dnn;
   static int64_t last_frame = 0;
-
-  if (g_use_dnn == 0)
-  {
-      // Use pilotnet algorithm
-      return;
-  }
 
   fr_begin = esp_timer_get_time();
 
@@ -331,22 +313,8 @@ void loop() {
   fr_dnn = esp_timer_get_time();
 
   int deg = (int)rad2deg(angle);
-  
-  // if (deg < 10 and deg > -10) 
-  // {
-  //   center();
-  //   printf("center (%d) by CPU", deg);
-  // } 
-  // else if (deg >= 10) 
-  // {
-  //   right();
-  //   printf("right (%d) by CPU", deg);
-  // } 
-  // else if (deg <= -10) 
-  // {
-  //   left();
-  //   printf("left (%d) by CPU", deg);
-  // }
+
+  // set steering  
   set_steering(deg);
   printf("deg=%d (%.3f q=%d)\n", deg, angle, q);
 
@@ -357,8 +325,11 @@ void loop() {
   }
   int64_t fr_end = esp_timer_get_time();
   int64_t frame_time = (fr_end - last_frame)/1000;
-  if (g_use_dnn) printf("Core%d:  %ums (%.1ffps): cap=%dms, pre=%dms, dnn=%dms\n", 
-      xPortGetCoreID(), (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time,
+
+  printf("Core%d: %s (prio=%d) %ums (%.1ffps): cap=%dms, pre=%dms, dnn=%dms\n", 
+      xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL), 
+      (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time,
       (int)((fr_cap-fr_begin)/1000), (int)((fr_pre-fr_cap)/1000), (int)((fr_dnn-fr_pre)/1000));
-  last_frame = fr_end;
+
+  last_frame = fr_end;  
 }

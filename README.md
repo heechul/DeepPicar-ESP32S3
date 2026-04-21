@@ -30,7 +30,7 @@ pip install -r requirements.txt
 
 ## Hardware Setup
 
-See [BUILD.md](src/BUILD.md) for ESP32-S3 and motor driver connection details.
+See [BUILD.md](./BUILD.md) for ESP32-S3 and motor driver connection details.
 
 ## Driving
 
@@ -172,7 +172,7 @@ pip install tensorflow
 - Use `camera-null.py` for testing without camera hardware
 
 **No actuator response**
-- Verify motor driver connections (see [BUILD.md](src/BUILD.md))
+- Verify motor driver connections (see [BUILD.md](./BUILD.md))
 - Use `actuator-null.py` for testing without motor driver hardware
 
 ### Performance

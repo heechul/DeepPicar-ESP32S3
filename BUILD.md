@@ -11,13 +11,13 @@
 ## Connection guideline
 
 ```
-  ESP32S3         DRV8835
-    GND     -->     GND             # Common ground
-    3V3     -->     3V3             # 3.3V power to the motor driver IC
-    D1      -->     GPIO5           # Left/Right direction
-    D2      -->     GPIO6           # Forward/Reverse direction
-    D3      -->     GPIO12          # Steering PWM
-    D4      -->     GPIO13          # Throttle PWM
+    ESP32S3                 DRV8835
+    GND             -->     GND             # Common ground
+    3V3             -->     3V3             # 3.3V power to the motor driver IC
+    D0 (GPIO1)      -->     GPIO5           # Left/Right direction
+    D1 (GPIO2)      -->     GPIO6           # Forward/Reverse direction
+    D2 (GPIO3)      -->     GPIO12          # Steering PWM
+    D3 (GPIO4)      -->     GPIO13          # Throttle PWM
 ```
 
 ## References

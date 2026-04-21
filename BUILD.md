@@ -3,11 +3,10 @@
 ## Components
 
 ## Pinouts 
-DRV8835 documentation:
-https://www.pololu.com/product/2753
 
-ESP32S3 documentation:
-https://wiki.seeedstudio.com/xiao_esp32s3_pin_multiplexing/
+![drv8835-pinout.jpg](./docs/drv8835-pinout.jpg)
+
+![esp32s3-pinout.jpg](./docs/esp32s3-pinout.jpg)
 
 ## Connection guideline
 
@@ -21,4 +20,8 @@ https://wiki.seeedstudio.com/xiao_esp32s3_pin_multiplexing/
     D4      -->     GPIO13          # Throttle PWM
 ```
 
-See [drv8835-pinout.jpg](./drv8835-pinout.jpg) and [esp32s3-pinout.jpg](./esp32s3-pinout.jpg).
+## References
+
+- DRV8835 documentation: https://www.pololu.com/product/2753
+- ESP32S3 documentation: https://wiki.seeedstudio.com/xiao_esp32s3_pin_multiplexing/
+

@@ -83,6 +83,7 @@ At runtime, press keys to control the vehicle:
 | `d` | Toggle DNN enable/disable |
 | `r` | Toggle data recording |
 | `q` | Quit |
+| `n` | On-device DNN |
 
 ### Data Recording
 
@@ -90,13 +91,15 @@ Press `r` to start/stop recording. The system records for up to 1000 frames then
 - `out-video.avi` - Video recording
 - `out-key.csv` - Timestamped key/steering data
 
-Compress all the recorded files into a single zip file, say Dataset.zip for Colab.
+If you want to use Google Cola, compress all the recorded files into a single zip file, say Dataset.zip for Colab.
 
 ```
 $ zip Dataset.zip out-*
 updating: out-key.csv (deflated 81%)
 updating: out-video.avi (deflated 3%)
 ```
+
+If you train locally, put all the recorded video and csv files on the 'dataset' folder. 
 
 ## Training
 
@@ -108,11 +111,11 @@ Training notebook includes:
 - Quantization for embedded deployment
 - Model conversion to TFLite format
 
-In Colab, upload Dataset.zip you created above, which will be used to train the model. 
+If you use Colab, upload a zip file (e.g., Dataset.zip you created above), which will be used to train the model. 
 
 ## Deployment to ESP32S3
 
-Use PlatformIO. 
+Use PlatformIO. [TBD]
 
 ## Models
 
@@ -131,15 +134,7 @@ Model files:
 - `.h5` - Keras/TensorFlow format
 - `.cc` - C++ source for embedded systems
 
-
 ## Troubleshooting
-
-### Model Loading Issues
-
-**Error: "No module named 'tensorflow'"**
-```bash
-pip install tensorflow
-```
 
 ### Hardware Connection
 

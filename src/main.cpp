@@ -10,6 +10,9 @@
 
 #include "camera_pins.h"
 #include "control.h" // motor control
+// prepare input image tensor
+
+#define USE_INT8 1
 
 #define SETUP_AP 1   // 1: setup AP mode, 0: setup Station mode
 #define WAIT_SERIAL 1 // 1: wait for serial monitor, 0: don't wait
@@ -96,8 +99,11 @@ void setup() {
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
   config.frame_size = FRAMESIZE_QVGA;
-  // config.pixel_format = PIXFORMAT_RGB565;
-  config.pixel_format = PIXFORMAT_JPEG; // for streaming
+  #if 1
+    config.pixel_format = PIXFORMAT_JPEG; // for streaming
+  #else
+    config.pixel_format = PIXFORMAT_RGB565; // for dnn
+  #endif
   config.grab_mode = CAMERA_GRAB_LATEST;
   config.fb_location = CAMERA_FB_IN_PSRAM;
   config.jpeg_quality = 12;
@@ -144,8 +150,6 @@ void loop() {
 #include "img.h"  // Use a static image for debugging
 #endif
 
-// prepare input image tensor
-#define USE_INT8 0
 
 #include "NeuralNetwork.h"
 extern NeuralNetwork *nn;

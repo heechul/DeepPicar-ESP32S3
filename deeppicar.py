@@ -173,7 +173,7 @@ parser.add_argument("-f", "--hz", help="control frequency", type=int)
 parser.add_argument("--fpvvideo", help="Take FPV video of DNN driving", action="store_true")
 parser.add_argument("--use", help="use [tflite|tf|openvino]", type=str, default="tflite")
 parser.add_argument("--pre", help="preprocessing [resize|crop]", type=str, default="resize")
-parser.add_argument("--int8", help="use int8 quantized model", action="store_true", default=False)
+parser.add_argument("--int8", help="use int8 quantized model", type=bool, default=True)
 parser.add_argument("--use_LET", help="use LET", action="store_true", default=False)    
 args = parser.parse_args()
 

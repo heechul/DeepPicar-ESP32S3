@@ -132,19 +132,17 @@ static esp_err_t stream_handler(httpd_req_t *req)
 
         // sleep 
         BaseType_t xWasDelayd = pdTRUE;
-        if (g_use_dnn)
+        if (g_use_dnn) {
             xWasDelayd = xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000)); // 1fps
-        else
+            printf("Core%d: %s (prio=%d): %u ms (%.1ffps): enc: %d ms\n",
+                xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL),
+                (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time, (uint32_t)((fr_enc - fr_cap)/1000));
+        } else {
             xWasDelayd = xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000 / 20)); // 20fps
-            
+        }
         if (xWasDelayd == pdFALSE) {
             log_w("Task was blocked for longer than the set period");       
         }
-#if 0 
-        printf("Core%d: %s (prio=%d): %u ms (%.1ffps): enc: %d ms\n",
-            xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL),
-            (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time, (uint32_t)((fr_enc - fr_cap)/1000));
-#endif 
     }
     return res;
 }

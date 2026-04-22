@@ -54,7 +54,6 @@ python deeppicar.py [options]
 | `--use` | str | tflite | Inference engine: tflite, tf, or openvino |
 | `--pre` | str | resize | Preprocessing: resize or crop |
 | `--int8` | flag | True | Use int8 quantized model |
-| `--use_LET` | flag | False | Use LiteRT interpreter |
 
 ### Examples
 

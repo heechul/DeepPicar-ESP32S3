@@ -68,11 +68,6 @@ Enable DNN inference at 50% throttle with 40Hz control frequency:
 python deeppicar.py -d -t 50 -f 40
 ```
 
-Use OpenVINO with CPU cores optimization:
-```bash
-python deeppicar.py -d --use openvino -n 4
-```
-
 ### Runtime Controls
 
 At runtime, press keys to control the vehicle:
@@ -95,22 +90,29 @@ Press `r` to start/stop recording. The system records for up to 1000 frames then
 - `out-video.avi` - Video recording
 - `out-key.csv` - Timestamped key/steering data
 
+Compress all the recorded files into a single zip file, say Dataset.zip for Colab.
+
+```
+$ zip Dataset.zip out-*
+updating: out-key.csv (deflated 81%)
+updating: out-video.avi (deflated 3%)
+```
+
 ## Training
 
-Use `RunAll-v2.ipynb` to train custom models. Customize model dimensions in params.py:
-
-```python
-img_width = 160      # Image width (pixels)
-img_height = 60      # Image height (pixels)
-img_channels = 3     # Color channels (1=grayscale, 3=RGB)
-temporal_context = 1 # Temporal frames (for LSTM models)
-```
+Use `RunAll-v2.ipynb` to train custom models. 
 
 Training notebook includes:
 - Data loading and preprocessing
-- Model architecture selection (CNN, ResNet, MobileNet)
+- Model architecture selection
 - Quantization for embedded deployment
 - Model conversion to TFLite format
+
+In Colab, upload Dataset.zip you created above, which will be used to train the model. 
+
+## Deployment to ESP32S3
+
+Use PlatformIO. 
 
 ## Models
 
@@ -121,7 +123,6 @@ Pre-trained models available in `models/` directory:
 | opt-k2-160x60x3-T1 | 160×60×3 | int8 | Balanced accuracy/speed |
 | opt-k2-160x120x3-T1 | 160×120×3 | int8 | High accuracy |
 | opt-k2-80x60x3-T1 | 80×60×3 | int8 | High speed, edge devices |
-| opt-160x60x1 | 160×60×1 | int8 | Grayscale, minimal compute |
 | opt-k2-40x30x3-T1 | 40×30×3 | int8 | Ultra-low latency |
 | pilotnet-dg-160x60x3-T1-r1.0 | 160×60×3 | int8 | DG-tuned model (devel) |
 
@@ -130,30 +131,6 @@ Model files:
 - `.h5` - Keras/TensorFlow format
 - `.cc` - C++ source for embedded systems
 
-### Model Selection
-
-Select model in `params.py`:
-```python
-model_name = "opt-k2"  # Model family
-# Model file auto-resolves to: models/opt-k2-{width}x{height}x{channels}-T{temporal}.tflite
-```
-
-## Inference Engines
-
-### TFLite (Default)
-- Best compatibility, smallest binary
-- CPU acceleration via XNNPACK
-- Fallback if tflite_runtime unavailable
-
-### TensorFlow
-- Full TF features, larger overhead
-- Use with `--use tf`
-- Good for complex post-processing
-
-### OpenVINO (devel branch)
-- Intel optimized inference
-- Multi-platform support (CPU, GPU, VPU)
-- Use with `--use openvino`
 
 ## Troubleshooting
 
@@ -185,7 +162,6 @@ pip install tensorflow
 
 **Poor inference accuracy**
 - Verify lighting conditions match training data
-- Check `--pre crop` vs `--pre resize` preprocessing
 - Retrain model with domain-specific data
 
 ## Model Viewer
@@ -195,27 +171,6 @@ Visualize and analyze TFLite models:
 - Inspect layer structure, weights, and operations
 
 ## Advanced Topics
-
-### int8 vs float Quantization
-
-**int8 (Quantized)**
-- Pros: 4× smaller, 2-4× faster, less memory
-- Cons: Slightly reduced accuracy (typically <1%)
-- Recommended for embedded/edge devices
-
-**float32**
-- Pros: Maximum accuracy, no quantization loss
-- Cons: 4× larger, slower inference
-- Use for research/development
-
-Switch in `params.py` or model selection.
-
-### Custom Preprocessing
-
-Edit `get_image_resize()` or `get_image_crop()` functions in `deeppicar.py` for:
-- Histogram equalization
-- Noise reduction
-- Augmentation
 
 ### Extending to New Hardware
 

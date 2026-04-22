@@ -145,7 +145,7 @@ void loop() {
 #endif
 
 // prepare input image tensor
-#define USE_INT8 1
+#define USE_INT8 0
 
 #include "NeuralNetwork.h"
 extern NeuralNetwork *nn;

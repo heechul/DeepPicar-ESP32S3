@@ -3,11 +3,11 @@ matplotlib
 tqdm 
 pandas
 requests
-# scikit-image 
-# scikit-learn
+scikit-image 
+scikit-learn
 # tensorflow_hub
 # tensorflow_datasets
 # tensorflow_model_optimization
-# tf_keras
+tf_keras
 tensorflow
 # tflite-runtime

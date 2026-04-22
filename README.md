@@ -113,9 +113,17 @@ Training notebook includes:
 
 If you use Colab, upload a zip file (e.g., Dataset.zip you created above), which will be used to train the model. 
 
+If training was successful, you will see the model's tflite file and C header file, for example, as follows. 
+
+```
+models/pilotnet-dg-160x60x3-T1-r1.0.tflite # tflite model file
+models/pilotnet-dg-160x60x3-T1-r1.0.cc     # c header file (= src/model.h)
+```
+
 ## Deployment to ESP32S3
 
-Use PlatformIO. [TBD]
+Use PlatformIO. 
+Hit the 'Build' and 'Deploy' botton at the bottom of VSCode UI. 
 
 ## Models
 

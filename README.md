@@ -73,6 +73,7 @@ At runtime, press keys to control the vehicle:
 
 | Key | Action |
 |-----|--------|
+| `t` | Toggle real-time stream viewing |
 | `j` | Left turn |
 | `l` | Right turn |
 | `k` | Center/straight |

@@ -316,7 +316,7 @@ void dnn_loop()
 
   // set steering  
   set_steering(deg);
-  printf("deg=%d (%.3f q=%d)\n", deg, angle, q);
+  printf("deg=%d (%.3f)\n", deg, angle);
 
   if (fb)
   {

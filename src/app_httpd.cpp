@@ -86,7 +86,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
         } else {
             _timestamp.tv_sec = fb->timestamp.tv_sec;
             _timestamp.tv_usec = fb->timestamp.tv_usec;
-            Serial.printf("fb: %dx%d, format: %d, len: %d\n", fb->width, fb->height, fb->format, fb->len);
+            // Serial.printf("fb: %dx%d, format: %d, len: %d\n", fb->width, fb->height, fb->format, fb->len);
 
             if (fb->format != PIXFORMAT_JPEG) {
                 bool jpeg_converted = frame2jpg(fb, 80, &_jpg_buf, &_jpg_buf_len);
@@ -140,9 +140,11 @@ static esp_err_t stream_handler(httpd_req_t *req)
         if (xWasDelayd == pdFALSE) {
             log_w("Task was blocked for longer than the set period");       
         }
+#if 0 
         printf("Core%d: %s (prio=%d): %u ms (%.1ffps): enc: %d ms\n",
             xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL),
-            (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time, (uint32_t)((fr_enc - fr_cap)/1000));            
+            (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time, (uint32_t)((fr_enc - fr_cap)/1000));
+#endif 
     }
     return res;
 }

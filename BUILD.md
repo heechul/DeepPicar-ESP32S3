@@ -2,8 +2,8 @@
 
 ## Components
 
-- DRV8835 Motor Driver IC
-- ESP32S3 MCU
+- Pololu DRV8835 Motor Driver
+- Xiao ESP32S3 MCU
 - Bread board jumper wires
 
 ## Pinouts 

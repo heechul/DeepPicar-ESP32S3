@@ -47,21 +47,27 @@ NeuralNetwork::NeuralNetwork()
     micro_op_resolver.AddQuantize();
     micro_op_resolver.AddDequantize();
 
+    if (kTensorArenaSize < gmodel_len)
+    {
+        MicroPrintf("WARNING: model size (%d bytes) is larger than the allocated tensor arena (%d bytes)", gmodel_len, kTensorArenaSize);
+        kTensorArenaSize = gmodel_len + 1024; // add some extra space for tensors
+        MicroPrintf("WARNING: increase kTensorArenaSize to %d bytes", kTensorArenaSize);
+    }
     tensor_arena = (uint8_t *)heap_caps_malloc(kTensorArenaSize, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     if (tensor_arena != NULL) {
-        MicroPrintf("allocated on SRAM\n");
+        MicroPrintf("kTensorArenaSize (%d bytes) allocated on SRAM\n", kTensorArenaSize);
         goto success;   
     }
     tensor_arena = (uint8_t *)heap_caps_malloc(kTensorArenaSize, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (tensor_arena != NULL) {
-        MicroPrintf("allocated on PSRAM\n");
+        MicroPrintf("kTensorArenaSize (%d bytes) allocated on PSRAM\n", kTensorArenaSize);
         goto success;   
     } else {
         printf("Couldn't allocate memory of %d bytes\n", kTensorArenaSize);
         return;
     }
 success:
-    printf("tensor_arena: %p\n", tensor_arena);
+    printf("tensor_arena: %p, size=%d\n", tensor_arena, kTensorArenaSize);
     printf("Free heap: %d\n", ESP.getFreeHeap());
 
     // Build an interpreter to run the model with.

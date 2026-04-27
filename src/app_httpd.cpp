@@ -48,7 +48,6 @@ extern int g_use_dnn; // defined in src/main.cpp
 // Core1, priority=5, stack=4096
 static esp_err_t stream_handler(httpd_req_t *req)
 {
-    camera_fb_t *fb = NULL;
     struct timeval _timestamp;
     esp_err_t res = ESP_OK;
     size_t _jpg_buf_len = 0;
@@ -73,15 +72,20 @@ static esp_err_t stream_handler(httpd_req_t *req)
 
     while (true)
     {
+        // Disable streaming while DNN is active
+        if (g_use_dnn) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+            continue;
+        }
+
         TickType_t xLastWakeTime = xTaskGetTickCount();
         fr_pre = esp_timer_get_time();
 
-        fb = esp_camera_fb_get();
-        
+        camera_fb_t *fb = esp_camera_fb_get();
         fr_cap = esp_timer_get_time();
 
         if (!fb) {
-            Serial.println("Camera capture failed");
+            Serial.printf("%s: Camera capture failed\n", __FUNCTION__);
             res = ESP_FAIL;
         } else {
             _timestamp.tv_sec = fb->timestamp.tv_sec;
@@ -120,6 +124,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
             free(_jpg_buf);
             _jpg_buf = NULL;
         }
+
         if (res != ESP_OK) {
             Serial.println("Send frame failed");
             break;
@@ -132,14 +137,11 @@ static esp_err_t stream_handler(httpd_req_t *req)
 
         // sleep 
         BaseType_t xWasDelayd = pdTRUE;
-        if (g_use_dnn) {
-            xWasDelayd = xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000)); // 1fps
-            printf("Core%d: %s (prio=%d): %u ms (%.1ffps): enc: %d ms\n",
-                xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL),
-                (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time, (uint32_t)((fr_enc - fr_cap)/1000));
-        } else {
-            xWasDelayd = xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000 / 20)); // 20fps
-        }
+        xWasDelayd = xTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000 / 20)); // 20fps
+        // printf("Core%d: %s (prio=%d): %u ms (%.1ffps): enc: %d ms\n",
+        //     xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL),
+        //     (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time, (uint32_t)((fr_enc - fr_cap)/1000));
+
         if (xWasDelayd == pdFALSE) {
             log_w("Task was blocked for longer than the set period");       
         }
@@ -175,6 +177,16 @@ static esp_err_t cmd_handler(httpd_req_t *req)
         sensor_t *s = esp_camera_sensor_get();
         if (s->pixformat != PIXFORMAT_RGB565) {
             s->set_pixformat(s, PIXFORMAT_RGB565);
+            // // Flush old frames from the buffer after format change
+            // for (int i = 0; i < 5; i++) {
+            //     camera_fb_t *fb = esp_camera_fb_get();
+            //     if (fb) {
+            //         esp_camera_fb_return(fb);
+            //     } else {
+            //         break;
+            //     }
+            // }
+            // delay(100);  // Give camera time to settle
         }
     } else if(!strcmp(variable, "manual")) {
         Serial.println("Manual mode");
@@ -182,6 +194,16 @@ static esp_err_t cmd_handler(httpd_req_t *req)
         sensor_t *s = esp_camera_sensor_get();
         if (s->pixformat != PIXFORMAT_JPEG) {
             s->set_pixformat(s, PIXFORMAT_JPEG);
+            // // Flush old frames from the buffer after format change
+            // for (int i = 0; i < 5; i++) {
+            //     camera_fb_t *fb = esp_camera_fb_get();
+            //     if (fb) {
+            //         esp_camera_fb_return(fb);
+            //     } else {
+            //         break;
+            //     }
+            // }
+            // delay(100);  // Give camera time to settle
         }
     } else if(!strcmp(variable, "throttle_pct")) {
         // printf("Core%d: %s (prio=%d): updated throttle %d\n",

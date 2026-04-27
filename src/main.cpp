@@ -278,15 +278,20 @@ void dnn_loop()
   int64_t fr_begin, fr_cap, fr_pre, fr_dnn;
   static int64_t last_frame = 0;
 
+  printf("Starting DNN loop on core %d\n", xPortGetCoreID());
+
   fr_begin = esp_timer_get_time();
 
   if (!last_frame)
     last_frame = fr_begin;
 
   fb = esp_camera_fb_get();
-
-  if (!fb) {
-    Serial.println("Camera capture failed");
+  if (!fb ) {
+    printf("%s: Camera capture failed\n", __FUNCTION__);
+    return;
+  } else if (fb->format != PIXFORMAT_RGB565) {
+    printf("%s: Camera capture has unsupported format %d\n", __FUNCTION__, fb->format);
+    esp_camera_fb_return(fb);
     return;
   }
 
@@ -327,11 +332,13 @@ void dnn_loop()
       esp_camera_fb_return(fb);
       fb = NULL;
   }
+
   int64_t fr_end = esp_timer_get_time();
   int64_t frame_time = (fr_end - last_frame)/1000;
 
-  printf("Core%d: %s (prio=%d) %ums (%.1ffps): cap=%dms, pre=%dms, dnn=%dms\n", 
-      xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL), 
+  printf("%s: Core%d: %s (prio=%d) %ums (%.1ffps): cap=%dms, pre=%dms, dnn=%dms\n",
+      __FUNCTION__,
+      xPortGetCoreID(), pcTaskGetName(NULL), uxTaskPriorityGet(NULL),
       (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time,
       (int)((fr_cap-fr_begin)/1000), (int)((fr_pre-fr_cap)/1000), (int)((fr_dnn-fr_pre)/1000));
 

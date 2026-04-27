@@ -271,10 +271,18 @@ temporal_context_buffer = []
 
 time.sleep(next(g))
 
+old_frame = None
+frame = None
+
 while True:
     ts = time.time()
+    old_frame = frame
+    if enable_ondevice_dnn:
+        # do not receive new frame if on-device DNN is enabled, since the DNN loop on the device will read the frame by itself.
+        frame = old_frame
+    else:
+        frame = camera.read_frame()
 
-    frame = camera.read_frame()
     if frame is None:
         print("frame is None")
         break

@@ -91,7 +91,7 @@ Press `r` to start/stop recording. The system records for up to 1000 frames then
 - `out-video.avi` - Video recording
 - `out-key.csv` - Timestamped key/steering data
 
-If you want to use Google Cola, compress all the recorded files into a single zip file, say Dataset.zip for Colab.
+If you want to use Google Colab, compress all the recorded files into a single zip file, say Dataset.zip for Colab.
 
 ```
 $ zip Dataset.zip out-*
